@@ -21,7 +21,7 @@ company = "NemaDB"
 copyright = "Copyright (C) 2026 NemaDB"
 
 [tool.flet.template]
-url = "E:/flet_code/flet_build_template"
+url = "./flet_build_template"
 
 [tool.flet.build]
 file_version = "1.0.0.0"
