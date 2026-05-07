@@ -1,0 +1,29 @@
+[project]
+name = "NemaDB"
+version = "1.0.0"
+description = "NemaDB"
+requires-python = ">=3.9"
+dependencies = [
+    "flet",
+]
+
+[tool.flet.app]
+path = "."
+module = "main"
+
+[tool.flet]
+exclude = [
+    ".*", 
+    "build",
+    ".venv",
+]
+company = "NemaDB"
+copyright = "Copyright (C) 2026 NemaDB"
+
+[tool.flet.template]
+url = "E:/flet_code/flet_build_template"
+
+[tool.flet.build]
+file_version = "1.0.0.0"
+product_version = "1.0.0.0"
+product_name = "NemaDB"

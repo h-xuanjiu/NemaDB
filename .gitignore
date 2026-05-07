@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# PyCharm
+.idea/
+
+# Flet
+build/
+dist/
+
+*.log
