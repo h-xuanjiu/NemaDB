@@ -27,7 +27,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Aelurostrongylus,Angiostrongylidae,Animal parasites,,38,994.307
 ,Africanastrongylus,Haemonchidae,Animal parasites,,,
 ,Afrophilometra,Philometridae,Animal parasites,,,
-,Agamermis ,Mermithidae,Animal parasites,,,
+,Agamermis,Mermithidae,Animal parasites,,,
 ,Agfa,Agfidae,Animal parasites,,,
 ,Agriostomum,Chabertiidae,Animal parasites,,,
 ,Agrochanus,Skrjabillanidae,Animal parasites,,,
@@ -36,7 +36,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Aliascaris,Heterocheilidae,Animal parasites,,,
 ,Allantonema,Allantonematidae,Animal parasites,,,
 ,Allintoshius,Ornithostrongylidae,Animal parasites,,,
-,Allomermis ,Mermithidae,Animal parasites,,,
+,Allomermis,Mermithidae,Animal parasites,,,
 ,Alocostoma,Chabertiidae,Animal parasites,,,
 ,Amidostomoides,Trichostrongylidae,Animal parasites,,96.554,88.593
 ,Amidostomum,Trichostrongylidae,Animal parasites,,109.287,88.593
@@ -221,7 +221,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Craterostomum,Strongylidae,Animal parasites,,,
 ,Creagrocercus,Creagrocercidae,Animal parasites,,,
 ,Crenosoma,Crenosomatidae,Animal parasites,,679.122,679.122
-,Crocodylocapillaria,Capillariidae ,Animal parasites,,,
+,Crocodylocapillaria,Capillariidae,Animal parasites,,,
 ,Crossocephalus,Atractidae,Animal parasites,,,
 ,Cruzia,Kathlaniidae,Animal parasites,,,
 ,Cruzostrongylus,Trichostrongylidae,Animal parasites,,,
@@ -289,7 +289,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Echidnonema,Subuluridae,Animal parasites,,10443.002,10443.002
 ,Echinocephalus,Gnathostomatidae,Animal parasites,,11579.261,10755.868
 ,Echinocoleus,Capillariidae,Animal parasites,,,
-,Elacolenchus ,Allantonematidae,Animal parasites,,,
+,Elacolenchus,Allantonematidae,Animal parasites,,,
 ,Elaeophora,Onchocercidae,Animal parasites,,,
 ,Elaphostrongylus,Protosrongylidae,Animal parasites,,,
 ,Encephalonema,Robertdollfusidae,Animal parasites,,,
@@ -330,7 +330,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Galinonema,Thelastomatidae,Animal parasites,,,
 ,Gallegostrongylus,Angiostrongylidae,Animal parasites,,,
 ,Garkavillanus,Skrjabillanidae,Animal parasites,,,
-,Gastromermis ,Mermithidae,Animal parasites,,,
+,Gastromermis,Mermithidae,Animal parasites,,,
 ,Gatesnema,Drilonematidae,Animal parasites,,,
 ,Gazellostrongylus,Cooperiidae,Animal parasites,,,
 ,Gedoelstascaris,Heterocheilidae,Animal parasites,,,
@@ -392,7 +392,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Heterostrongylus,Angiostrongylidae,Animal parasites,,,
 ,Heterotylenchus,Parasitylenchidae,Animal parasites,,,
 ,Heth,Hethidae,Animal parasites,,31.553,31.553
-,Hexamermis ,Mermithidae,Animal parasites,,,
+,Hexamermis,Mermithidae,Animal parasites,,,
 ,Hexapapillostomum,Trichostrongylidae,Animal parasites,,,
 ,Heydenius,Mermithidae,Animal parasites,,,
 ,Hineffia,Viannaiidae,Animal parasites,,,
@@ -429,7 +429,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Iponema,Drilonematidae,Animal parasites,,1.277,15.394
 ,Ischilinema,Viannaiidae,Animal parasites,,,
 ,Isobinema,Travassosinematidae,Animal parasites,,,
-,Isomermis ,Mermithidae,Animal parasites,,,
+,Isomermis,Mermithidae,Animal parasites,,,
 ,Jaidenema,Thelastomatidae,Animal parasites,,,
 ,Johnpearsonia,Amphibiophilidae,Animal parasites,,50.95,50.95
 ,Johnstonia,Thelastomatidae,Animal parasites,,,
@@ -518,7 +518,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Maupasina,Maupasinidae,Animal parasites,,,
 ,Mawsonema,Heligmonellidae,Animal parasites,,,
 ,Maxomystrongylus,Heligmonellidae,Animal parasites,,3.636,360.479
-,Maxvachonia, Cosmocercidae,Animal parasites,,4254.527,871.917
+,Maxvachonia,Cosmocercidae,Animal parasites,,4254.527,871.917
 ,Mazamastrongylus,Haemonchidae,Animal parasites,,,
 ,Mbaisonema,Chabertiidae,Animal parasites,,,
 ,Mbanema,Drilonematidae,Animal parasites,,,
@@ -529,7 +529,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Melolonthinimermis,Mermithidae,Animal parasites,,,
 ,Melomystrongylus,Heligmonellidae,Animal parasites,,,
 ,Mentecle,Hystrignathidae,Animal parasites,,,
-,Mermis ,Mermithidae,Animal parasites,,,
+,Mermis,Mermithidae,Animal parasites,,,
 ,Mertensinema,Molineidae,Animal parasites,,,
 ,Mesamidostomum,Trichostrongylidae,Animal parasites,,,
 ,Mesidionema,Mesidionematidae,Animal parasites,,,
@@ -632,7 +632,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Oswaldonema,Viannaiidae,Animal parasites,,,
 ,Oswaldostrongylus,Ornithostrongylidae,Animal parasites,,,
 ,Otostrongylus,Crenosomatidae,Animal parasites,,,
-,Ovomermis ,Mermithidae,Animal parasites,,,
+,Ovomermis,Mermithidae,Animal parasites,,,
 ,Oxysomatium,Cosmocercidae,Animal parasites,,,
 ,Oxyspirura,Thelaziidae,Animal parasites,,746.369,9768.474
 ,Oxyuris,Oxyuridae,Animal parasites,,5594.379,863.815
@@ -1136,7 +1136,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Halirhabdolaimus,Haliplectidae,Bacterial feeders,2,,
 ,Hemiplectus,Plectidae,Bacterial feeders,2,2.484,0.736
 ,Heterocephalobellus,Cephalobidae,Bacterial feeders,2,0.345,0.484
-,Heterocephalobus,Cephalobidae,Bacterial feeders,2,0.356,0.484
+异头叶属,Heterocephalobus,Cephalobidae,Bacterial feeders,2,0.356,0.484
 ,Heterorhabditis,Heterorhabditidae,Bacterial feeders,1,70.179,70.179
 ,Isolaimium,Isolaimiidae,Bacterial feeders,5,22.232,22.232
 ,Keralonema,Chronogastridae,Bacterial feeders,3,,
@@ -1157,7 +1157,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 后双胃属,Metadiplogaster,Diplogastridae,Bacterial feeders,1,1.33,2.388
 ,Metamphidelus,Amphidelidae,Bacterial feeders,4,0.505,0.623
 ,Metarhabditis,Rhabditidae,Bacterial feeders,1,1.304,5.766
-,Metateratocephalus,Teratocephalidae,Bacterial feeders,3,0.073,0.142
+后畸头属,Metateratocephalus,Teratocephalidae,Bacterial feeders,3,0.073,0.142
 嗜腐属,Micoletzkya,Neodiplogastridae,Bacterial feeders,1,34.439,4.39
 微咽属,Microlaimus,Microlaimidae,Bacterial feeders,3,0.41,0.566
 单宫属,Monhystera,Monhysteridae,Bacterial feeders,1,0.918,0.691
@@ -1172,7 +1172,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Neosteinernema,Steinernematidae,Bacterial feeders,2,,
 ,Neotylocephalus,Plectidae,Bacterial feeders,2,0.04,0.736
 ,Nothacrobeles,Cephalobidae,Bacterial feeders,2,0.363,0.484
-,Odontolaimus,Odontolaimidae,Bacterial feeders,3,0.16,0.16
+齿腔属,Odontolaimus,Odontolaimidae,Bacterial feeders,3,0.16,0.16
 ,Operculorhabditis,Rhabditidae,Bacterial feeders,1,1.4,5.766
 ,Oscheius,Rhabditidae,Bacterial feeders,1,6.596,5.766
 ,Osstella,Osstellidae,Bacterial feeders,2,0.21,0.216
@@ -1185,7 +1185,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Panagroteratus,Cephalobidae,Bacterial feeders,2,,
 ,Paracephalobus,Cephalobidae,Bacterial feeders,2,0.595,0.484
 ,Paracrobeles,Cephalobidae,Bacterial feeders,2,0.494,0.484
-,Paramphidelus,Amphidelidae,Bacterial feeders,4,0.198,0.623
+拟高杯侧器属,Paramphidelus,Amphidelidae,Bacterial feeders,4,0.198,0.623
 类隐咽属,Paraphanolaimus,Aphanolaimidae,Bacterial feeders,3,0.715,0.723
 ,Parapristionchus,Diplogastridae,Bacterial feeders,1,,
 ,Parasitorhabditis,Rhabditidae,Bacterial feeders,1,1.242,5.766
@@ -1308,8 +1308,8 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Dotylaphus,Neotylenchidae,Fungus feeders,2,0.182,0.85
 ,Echinodorus,Encholaimidae,Fungus feeders,4,0.503,0.314
 ,Encholaimus,Encholaimidae,Fungus feeders,4,0.14,0.314
-,Filenchus,Tylenchidae,Fungus feeders,2,0.099,0.158
-,Funaria,Leptonchidae,Fungus feeders,4,1.898,0.78
+丝尾垫刃属,Filenchus,Tylenchidae,Fungus feeders,2,0.099,0.158
+弗那属,Funaria,Leptonchidae,Fungus feeders,4,1.898,0.78
 ,Fungiotonchium,Iotonchiidae,Fungus feeders,4,2.902,3.645
 ,Gerthus,Tylencholaimellidae,Fungus feeders,4,,
 ,Glochidorella,Leptonchidae,Fungus feeders,4,,
@@ -1938,7 +1938,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Acronema,Marimermithidae,Marine parasites,,,
 ,Ananus,Marimermithidae,Marine parasites,,,
 ,Australonema,Marimermithidae,Marine parasites,,,
-,Marimermis ,Marimermithidae,Marine parasites,5,,
+,Marimermis,Marimermithidae,Marine parasites,5,,
 ,Thalassonema,Marimermithidae,Marine parasites,,,
 ,Africanthion,Thoracostomopsidae,Marine predators,,,
 ,Cryptenoplus,Thoracostomopsidae,Marine predators,,,
@@ -2025,12 +2025,12 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 大矛属,Enchodelus,Nordiidae,Omnivores,4,3.596,2.868
 ,Enchodorus,Nordiidae,Omnivores,4,,
 ,Epacrolaimus,Aporcelaimidae,Omnivores,5,122.068,23.538
-,Falcihasta, Swangeriidae,Omnivores,,,
+,Falcihasta,Swangeriidae,Omnivores,,,
 ,Fuchseila,Dorylaimidae,Omnivores,4,,
 ,Gopalus,Paraxonchiidae,Omnivores,4,,
 ,Halodorylaimus,Dorylaimidae,Omnivores,4,,
 ,Heterodorus,Nordiidae,Omnivores,4,3.453,2.868
-,Hulqus, Swangeriidae,Omnivores,,,
+,Hulqus,Swangeriidae,Omnivores,,,
 ,Idiodorylaimus,Dorylaimidae,Omnivores,4,,
 ,Inbionema,Nordiidae,Omnivores,4,,
 ,Indodorylaimus,Thornenematidae,Omnivores,5,,
@@ -2042,7 +2042,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 拱唇属,Labronema,Dorylaimidae,Omnivores,4,8.974,10.305
 ,Labronemella,Dorylaimidae,Omnivores,4,5.862,10.305
 ,Lagenonema,Thornenematidae,Omnivores,5,0.175,1.167
-,Laimydorus,Dorylaimidae,Omnivores,4,5.901,10.305
+咽针属,Laimydorus,Dorylaimidae,Omnivores,4,5.901,10.305
 ,Lanzavecchia,Nordiidae,Omnivores,4,75.688,2.868
 ,Lauraphragus,Thornenematidae,Omnivores,5,,
 ,Lenonchium,Nordiidae,Omnivores,4,,
@@ -2078,7 +2078,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Parastomachoglossa,Actinolaimidae,Omnivores,5,7.575,7.303
 ,Paratimminema,Thornenematidae,Omnivores,5,0.15,1.167
 ,Paratimmus,Mydonomidae,Omnivores,4,0.999,2.356
-,Paraxonchium,Paraxonchiidae,Omnivores,4,5.232,4.909
+类缢咽属,Paraxonchium,Paraxonchiidae,Omnivores,4,5.232,4.909
 ,Paroriverutus,Nordiidae,Omnivores,4,1.504,2.868
 ,Paroxybelondira,Swangeriidae,Omnivores,,,
 ,Paroxydirus,Swangeriidae,Omnivores,,,
@@ -2112,7 +2112,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Stopractinca,Actinolaimidae,Omnivores,5,,
 ,Talanema,Qudsianematidae,Omnivores,4,2.728,2.849
 ,Tendinema,Paraxonchiidae,Omnivores,4,,
-,Thonus,Dorylaimidae,Omnivores,4,1.891,10.305
+索努斯属,Thonus,Dorylaimidae,Omnivores,4,1.891,10.305
 ,Thornedia,Nordiidae,Omnivores,4,,
 拟桑尼属,Thorneella,Thorniidae,Omnivores,4,2.195,1.076
 ,Thornenema,Thornenematidae,Omnivores,5,1.081,1.167
@@ -2120,7 +2120,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Thorniosa,Thorniidae,Omnivores,4,0.968,1.076
 ,Timminema,Thornenematidae,Omnivores,5,,
 ,Timmus,Mydonomidae,Omnivores,4,,
-,Torumanawa,Dorylaimidae,Omnivores,4,3.013,10.305
+图鲁玛那瓦属,Torumanawa,Dorylaimidae,Omnivores,4,3.013,10.305
 ,Trachactinolaimus,Actinolaimidae,Omnivores,5,3.708,7.303
 ,Trachypleurosum,Actinolaimidae,Omnivores,4,2.824,7.303
 ,Tubixaba,Aporcelaimidae,Omnivores,5,21.815,23.538
@@ -2163,6 +2163,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 双垫刃属,Bitylenchus,Dolichodoridae,Plant feeders,3,0.314,0.569
 ,Blandicephalonema,Criconematidae,Plant feeders,3,,
 散香属,Boleodorus,Tylenchidae,Plant feeders,2,0.1,0.158
+叉针属,Boleodorus,Tylenchidae,Plant feeders,2,0.1,0.158
 ,Boomerangia,Tylenchulidae,Plant feeders,,0.086,0.775
 矮针属,Brachydorus,Dolichodoridae,Plant feeders,3,0.974,0.569
 ,Bursadera,Heteroderidae,Plant feeders,3,,
@@ -2177,7 +2178,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Cervoannulatus,Tylenchidae,Plant feeders,2,0.074,0.158
 ,Chilenchus,Tylenchidae,Plant feeders,2,0.105,0.158
 ,Chitinotylenchus,Anguinidae,Plant feeders,2,,
-,Coslenchus,Tylenchidae,Plant feeders,2,0.1,0.158
+具脊垫刃属,Coslenchus,Tylenchidae,Plant feeders,2,0.1,0.158
 ,Cotylenchus,Anguinidae,Plant feeders,2,0.258,6.368
 环属,Criconema,Criconematidae,Plant feeders,3,0.645,0.557
 ,Criconemella,Criconematidae,Plant feeders,3,,
@@ -2194,10 +2195,10 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 茎属,Ditylenchus,Anguinidae,Plant feeders,2,0.363,6.368
 ,Dolichodera,Heteroderidae,Plant feeders,3,7.996,82.654
 锥属,Dolichodorus,Dolichodoridae,Plant feeders,3,2.968,0.569
-,Dolichorhynchus,Telotylenchidae,Plant feeders,3,0.499,0.569
+长吻属,Dolichorhynchus,Telotylenchidae,Plant feeders,3,0.499,0.569
 牙咽属,Dorylaimellus,Dorylaimellidae,Plant feeders,5,0.303,0.289
 ,Duotylenchus,Tylenchidae,Plant feeders,2,,
-,Ecphyadophora,Tylenchidae,Plant feeders,2,0.02,0.158
+突腔唇属,Ecphyadophora,Tylenchidae,Plant feeders,2,0.02,0.158
 ,Ecphyadophoroides,Tylenchidae,Plant feeders,2,0.037,0.158
 ,Ecuadorus,Trichodoridae,Plant feeders,4,,
 ,Ekphymatodera,Heteroderidae,Plant feeders,3,,
@@ -2231,16 +2232,16 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Irantylenchus,Tylenchidae,Plant feeders,2,0.273,0.158
 ,Labrys,Tylenchidae,Plant feeders,2,0.042,0.158
 ,Laimaphelenchus,Aphelenchoididae,Plant feeders,2,0.209,0.207
-,Lelenchus,Tylenchidae,Plant feeders,2,0.047,0.158
+细纹垫刃属,Lelenchus,Tylenchidae,Plant feeders,2,0.047,0.158
 ,Litylenchus,Anguinidae,Plant feeders,2,0.281,6.368
 ,Lobocriconema,Criconematidae,Plant feeders,3,,
 短体长针属,Longidorella,Nordiidae,Plant feeders,4,0.595,2.868
 ,Longidoroides,Longidoridae,Plant feeders,5,,
 长针属,Longidorus,Longidoridae,Plant feeders,5,14.572,12.378
-,Loofia,Hemicycliophoridae,Plant feeders,3,,
+卢夫属,Loofia,Hemicycliophoridae,Plant feeders,3,,
 ,Luella,Paurodontidae,Plant feeders,2,,
 ,Macrotrophurus,Dolichodoridae,Plant feeders,3,1.385,0.569
-,Malenchus,Tylenchidae,Plant feeders,2,0.08,0.158
+剑尾垫刃属,Malenchus,Tylenchidae,Plant feeders,2,0.08,0.158
 ,Martininema,Aphelenchoididae,Plant feeders,2,0.099,0.207
 ,Meiodorus,Dolichodoridae,Plant feeders,3,0.436,0.569
 ,Meloidodera,Heteroderidae,Plant feeders,3,34.138,82.654
@@ -2248,7 +2249,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Meloidoderita,Tylenchulidae,Plant feeders,3,15.434,0.775
 根结属,Meloidogyne,Meloidogynidae,Plant feeders,3,78,78
 ,Meloinema,Heteroderidae,Plant feeders,3,740.343,82.654
-,Merlinius,Merliniidae,Plant feeders,3,0.253,0.59
+默林属,Merlinius,Merliniidae,Plant feeders,3,0.253,0.59
 ,Mesoanguina,Anguinidae,Plant feeders,2,9.419,6.368
 ,Mesocriconema,Criconematidae,Plant feeders,3,0.5,0.557
 ,Mesodolichodera,Heteroderidae,Plant feeders,3,,
@@ -2261,7 +2262,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Mukazia,Tylenchidae,Plant feeders,2,,
 ,Nacobbodera,Heteroderidae,Plant feeders,3,,
 ,Nacobbus,Pratylenchidae,Plant feeders,3,66.459,1.871
-,Nagelus,Merliniidae,Plant feeders,3,0.67,0.59
+那格尔属,Nagelus,Merliniidae,Plant feeders,3,0.67,0.59
 ,Nanidorus,Trichodoridae,Plant feeders,3,0.471,0.906
 ,Neobakernema,Criconematidae,Plant feeders,3,,
 ,Neoditylenchus,Anguinidae,Plant feeders,2,,
@@ -2275,7 +2276,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Nothanguina,Anguinidae,Plant feeders,2,,
 ,Nothocriconema,Criconematidae,Plant feeders,3,,
 ,Nothocriconemoides,Criconematidae,Plant feeders,3,1.237,0.557
-,Ogma,Criconematidae,Plant feeders,3,0.715,0.557
+沟环属,Ogma,Criconematidae,Plant feeders,3,0.715,0.557
 ,Opailaimus,Belondiridae,Plant feeders,5,0.262,5.011
 ,Orphreyus,Criconematidae,Plant feeders,3,,
 ,Orrina,Anguinidae,Plant feeders,2,,
@@ -2296,7 +2297,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Pratylenchoides,Merliniidae,Plant feeders,3,0.381,0.59
 短体属,Pratylenchus,Pratylenchidae,Plant feeders,3,0.143,1.871
 ,Probelondira,Belondiridae,Plant feeders,5,0.55,5.011
-,Pseudhalenchus,Anguinidae,Plant feeders,2,0.07,6.368
+假海滨属,Pseudhalenchus,Anguinidae,Plant feeders,2,0.07,6.368
 裸矛属,Psilenchus,Tylenchidae,Plant feeders,2,0.552,0.158
 ,Pterotylenchus,Anguinidae,Plant feeders,2,0.258,6.368
 ,Punctodera,Heteroderidae,Plant feeders,3,30.152,82.654
@@ -2305,7 +2306,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 穿孔属,Radopholus,Pratylenchidae,Plant feeders,3,0.212,1.871
 ,Rhizonemella,Heteroderidae,Plant feeders,3,,
 ,Ridgellus,Tylenchidae,Plant feeders,2,0.102,0.158
-,Rotylenchulus,Hoplolaimidae,Plant feeders,3,1.708,0.593
+肾状属,Rotylenchulus,Hoplolaimidae,Plant feeders,3,1.708,0.593
 盘旋属,Rotylenchus,Hoplolaimidae,Plant feeders,3,0.851,0.593
 ,Safianema,Anguinidae,Plant feeders,2,0.14,6.368
 ,Sakia,Tylenchidae,Plant feeders,2,0.064,0.158
@@ -2318,14 +2319,14 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Siddiqia,Longidoridae,Plant feeders,5,54.899,12.378
 ,Sigmolenchus,Tylenchidae,Plant feeders,2,0.036,0.158
 ,Silenchus,Tylenchidae,Plant feeders,2,0.123,0.158
-,Sphaeronema, Tylenchulidae,Plant feeders,3,4.328,0.775
+,Sphaeronema,Tylenchulidae,Plant feeders,3,4.328,0.775
 ,Subanguina,Anguinidae,Plant feeders,2,4.125,6.368
 峡瓣属,Swangeria,Belondiridae,Plant feeders,5,0.505,5.011
 ,Sychnotylenchus,Anguinidae,Plant feeders,2,0.37,6.368
 ,Syncheilaxonchium,Belondiridae,Plant feeders,5,5.08,5.011
 ,Tanzanius,Tylenchidae,Plant feeders,2,0.025,0.158
 ,Telotylenchus,Telotylenchidae,Plant feeders,3,0.315,0.569
-,Tenunemellus,Tylenchidae,Plant feeders,2,0.043,0.158
+类突腔唇属,Tenunemellus,Tylenchidae,Plant feeders,2,0.043,0.158
 ,Tetylenchus,Dolichodoridae,Plant feeders,3,,
 ,Thada,Tylenchidae,Plant feeders,2,0.089,0.158
 ,Thecavermiculatus,Heteroderidae,Plant feeders,3,,
@@ -2376,13 +2377,13 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Caribenema,Qudsianematidae,Predators,4,,
 ,Caryboca,Qudsianematidae,Predators,4,,
 ,Choanolaimus,Selachinematidae,Predators,,9.41,9.41
-,Clarkus,Mononchidae,Predators,4,3.897,7.452
+克拉克属,Clarkus,Mononchidae,Predators,4,3.897,7.452
 ,Clavicauda,Nygolaimidae,Predators,5,,
 ,Clavicaudoides,Nygolaimidae,Predators,5,0.351,4.155
 ,Cobbonchulus,Cobbonchidae,Predators,4,,
-,Cobbonchus,Cobbonchidae,Predators,4,4.103,4.103
+卡勃属,Cobbonchus,Cobbonchidae,Predators,4,4.103,4.103
 同等齿属,Comiconchus,Cobbonchidae,Predators,4,,
-,Coomansus,Mononchidae,Predators,4,6.671,7.452
+库曼属,Coomansus,Mononchidae,Predators,4,6.671,7.452
 ,Crassibucca,Anatonchidae,Predators,4,,
 ,Crestonchulus,Mylonchulidae,Predators,4,,
 ,Cryptonchus,Bathyodontidae,Predators,4,1.539,1.725
@@ -2396,13 +2397,13 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Ecumenicus,Qudsianematidae,Predators,4,0.635,2.849
 ,Ektaphelenchoides,Aphelenchoididae,Predators,2,0.212,0.207
 ,Ektaphelenchus,Aphelenchoididae,Predators,2,0.226,0.207
-,Epidorylaimus,Qudsianematidae,Predators,4,1.892,2.849
+表矛线属,Epidorylaimus,Qudsianematidae,Predators,4,1.892,2.849
 ,Epitobrilus,Tobrilidae,Predators,3,8.037,6.195
 真矛属,Eudorylaimus,Qudsianematidae,Predators,4,3.135,2.849
 ,Eutobrilus,Tobrilidae,Predators,3,1.727,6.195
 ,Feroxides,Nygolaimidae,Predators,5,,
 ,Filidiscolaimus,Qudsianematidae,Predators,4,,
-,Granonchulus,Mylonchulidae,Predators,4,4.102,1.87
+大齿属,Granonchulus,Mylonchulidae,Predators,4,4.102,1.87
 ,Hadronchus,Iotonchidae,Predators,,,
 ,Iotonchulus,Iotonchidae,Predators,4,4.978,6.799
 基齿属,Iotonchus,Iotonchidae,Predators,4,6.917,6.799
@@ -2422,7 +2423,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 ,Mesotobrilus,Tobrilidae,Predators,3,,
 ,Micatonchus,Anatonchidae,Predators,4,,
 等齿属,Miconchus,Anatonchidae,Predators,4,4.782,7.385
-,Microdorylaimus,Qudsianematidae,Predators,4,0.201,2.849
+小矛线属,Microdorylaimus,Qudsianematidae,Predators,4,0.201,2.849
 ,Mirolaimus,Bathyodontidae,Predators,4,,
 单棘属,Mononchulus,Mononchulidae,Predators,4,0.982,0.831
 单齿属,Mononchus,Mononchidae,Predators,4,6.38,7.452
@@ -2486,7 +2487,7 @@ Genus(zh),Genus(la),Family,Feeding,CP,Genus.Average.Mass,Family.Average.Mass
 三孔属,Tripyla,Tripylidae,Predators,3,4.735,3.396
 ,Tripylella,Tripylidae,Predators,3,0.741,3.396
 ,Tripylina,Trischistomatidae,Predators,3,1.422,1.309
-,Trischistoma,Trischistomatidae,Predators,3,1.042,1.309
+三裂体属,Trischistoma,Trischistomatidae,Predators,3,1.042,1.309
 ,Truxonchus,Anatonchidae,Predators,4,,
 ,Westindicus,Actinolaimidae,Predators,5,0,7.303
 ,Zullinius,Odontopharyngidae,Predators,1,,

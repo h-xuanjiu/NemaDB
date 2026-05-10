@@ -1,4 +1,5 @@
 import csv
+import json
 from pathlib import Path
 import flet as ft
 import sys
@@ -79,6 +80,120 @@ ALL_LA = sorted({row[1].strip() for row in ALL_ROWS if row[1].strip()})
 # ========== 录入数据内存存储 ==========
 samples_memory = {}  # {sample_name: total_abundance}
 abundances_memory = []  # [(sample_name, genus_la, abundance), ...]
+DRAFT_FORMAT_NAME = "NemaDB Input Draft"
+DRAFT_FORMAT_VERSION = 1
+DRAFT_FILE_EXTENSION = ".nemadb"
+
+
+def sanitize_filename_prefix(name):
+    invalid_chars = '<>:"/\\|?*'
+    safe = "".join("_" if char in invalid_chars or ord(char) < 32 else char for char in name.strip())
+    safe = "_".join(safe.split())
+    safe = safe.strip(" ._")
+    return safe or "nemadb_project"
+
+
+def build_draft_payload(project_name, samples, abundances):
+    sample_records = []
+    for name, total_abundance in samples.items():
+        genera = [
+            {
+                "genus_la": genus_la,
+                "genus_zh": LA_TO_ZH.get(genus_la, ""),
+                "abundance": abundance,
+            }
+            for sample_name, genus_la, abundance in abundances
+            if sample_name == name
+        ]
+        sample_records.append(
+            {
+                "name": name,
+                "total_abundance": total_abundance,
+                "genera": genera,
+            }
+        )
+
+    return {
+        "format": DRAFT_FORMAT_NAME,
+        "version": DRAFT_FORMAT_VERSION,
+        "app_version": version,
+        "project_name": project_name,
+        "samples": sample_records,
+    }
+
+
+def parse_draft_payload(payload):
+    if not isinstance(payload, dict):
+        raise ValueError("Draft file must contain a JSON object.")
+    if payload.get("format") != DRAFT_FORMAT_NAME:
+        raise ValueError("This is not a NemaDB input draft file.")
+    if payload.get("version") != DRAFT_FORMAT_VERSION:
+        raise ValueError(
+            f"Unsupported draft version: {payload.get('version')}. "
+            f"Expected version {DRAFT_FORMAT_VERSION}."
+        )
+
+    sample_entries = payload.get("samples")
+    if not isinstance(sample_entries, list):
+        raise ValueError("Draft file is missing the samples list.")
+
+    loaded_samples = {}
+    loaded_abundances = []
+    project_name = payload.get("project_name", "")
+    if project_name is None:
+        project_name = ""
+    if not isinstance(project_name, str):
+        raise ValueError("Draft file has an invalid project name.")
+    project_name = project_name.strip()
+
+    for sample_index, sample in enumerate(sample_entries, start=1):
+        if not isinstance(sample, dict):
+            raise ValueError(f"Sample #{sample_index} must be an object.")
+
+        sample_name = sample.get("name")
+        if not isinstance(sample_name, str) or not sample_name.strip():
+            raise ValueError(f"Sample #{sample_index} is missing a valid name.")
+        sample_name = sample_name.strip()
+        if sample_name in loaded_samples:
+            raise ValueError(f"Duplicate sample name in draft: {sample_name}.")
+
+        try:
+            total_abundance = float(sample.get("total_abundance"))
+        except (TypeError, ValueError):
+            raise ValueError(f"Sample '{sample_name}' has an invalid total abundance.")
+        if total_abundance < 0:
+            raise ValueError(f"Sample '{sample_name}' has a negative total abundance.")
+
+        genera = sample.get("genera", [])
+        if not isinstance(genera, list):
+            raise ValueError(f"Sample '{sample_name}' has an invalid genera list.")
+
+        loaded_samples[sample_name] = total_abundance
+
+        for genus_index, genus in enumerate(genera, start=1):
+            if not isinstance(genus, dict):
+                raise ValueError(
+                    f"Genus #{genus_index} in sample '{sample_name}' must be an object."
+                )
+            genus_la = genus.get("genus_la")
+            if not isinstance(genus_la, str) or not genus_la.strip():
+                raise ValueError(
+                    f"Genus #{genus_index} in sample '{sample_name}' is missing genus_la."
+                )
+            try:
+                abundance = float(genus.get("abundance"))
+            except (TypeError, ValueError):
+                raise ValueError(
+                    f"Genus '{genus_la}' in sample '{sample_name}' has invalid abundance."
+                )
+            if abundance < 0:
+                raise ValueError(
+                    f"Genus '{genus_la}' in sample '{sample_name}' has negative abundance."
+                )
+            if abundance > 0:
+                loaded_abundances.append((sample_name, genus_la.strip(), abundance))
+
+    return project_name, loaded_samples, loaded_abundances
 
 
 # ========== 主函数 ==========
@@ -197,6 +312,10 @@ def main(page: ft.Page):
     # ==================== Input Page ====================
     new_sample_btn = ft.Button("New Sample", icon=ft.Icons.ADD_CARD, disabled=True)
     export_btn = ft.Button("Export", icon=ft.Icons.DOWNLOAD, disabled=True)
+    save_draft_btn = ft.Button("Save Draft", icon=ft.Icons.SAVE, disabled=True)
+    load_draft_btn = ft.Button("Load Draft", icon=ft.Icons.UPLOAD_FILE)
+    current_project = {"name": ""}
+    project_name_text = ft.Text("Project: not created", color=ft.Colors.GREY_600)
     sample_form = ft.Column()
     sample_list_view = ft.ListView(spacing=8, padding=10, expand=True)
 
@@ -214,6 +333,17 @@ def main(page: ft.Page):
         page.overlay.append(dlg)
         dlg.open = True
         page.update()
+
+    draft_file_picker = ft.FilePicker()
+    page.services.append(draft_file_picker)
+
+    def update_project_label():
+        if current_project["name"]:
+            project_name_text.value = f"Project: {current_project['name']}"
+            project_name_text.color = ft.Colors.BLUE_GREY_700
+        else:
+            project_name_text.value = "Project: not created"
+            project_name_text.color = ft.Colors.GREY_600
 
     # ---- 样本列表操作 ----
     def delete_sample(name):
@@ -520,15 +650,55 @@ def main(page: ft.Page):
     genus_rows = ft.Column()
 
     # ---- 新建项目 ----
-    def new_project(e):
+    def create_project(project_name):
+        current_project["name"] = project_name
         samples_memory.clear()
         abundances_memory.clear()
         new_sample_btn.disabled = False
         export_btn.disabled = False
+        save_draft_btn.disabled = False
         sample_form.controls.clear()
+        update_project_label()
         refresh_sample_list()
-        page.snack_bar = ft.SnackBar(ft.Text("New project created. Ready for input."), duration=3000)
+        page.snack_bar = ft.SnackBar(
+            ft.Text(f"Project '{project_name}' created. Ready for input."),
+            duration=3000,
+        )
         page.snack_bar.open = True
+        page.update()
+
+    def new_project(e):
+        project_name_field = ft.TextField(
+            label="Project Name",
+            autofocus=True,
+            width=360,
+            hint_text="e.g. greenhouse_2026_spring",
+        )
+
+        def on_cancel(event):
+            dlg.open = False
+            page.update()
+
+        def on_create(event):
+            project_name = project_name_field.value.strip()
+            if not project_name:
+                project_name_field.error_text = "Please enter a project name."
+                page.update()
+                return
+            dlg.open = False
+            page.update()
+            create_project(project_name)
+
+        dlg = ft.AlertDialog(
+            title=ft.Text("New Project"),
+            content=project_name_field,
+            actions=[
+                ft.TextButton("Cancel", on_click=on_cancel),
+                ft.TextButton("Create", on_click=on_create),
+            ],
+        )
+        page.overlay.append(dlg)
+        dlg.open = True
         page.update()
 
     new_project_btn = ft.Button("New Project", icon=ft.Icons.CREATE_NEW_FOLDER, on_click=new_project)
@@ -806,10 +976,144 @@ def main(page: ft.Page):
         ]
         page.update()
 
+    # ---- 草稿保存 / 读取 ----
+    def apply_loaded_draft(loaded_project_name, loaded_samples, loaded_abundances):
+        current_project["name"] = loaded_project_name or "Imported draft"
+        samples_memory.clear()
+        samples_memory.update(loaded_samples)
+        abundances_memory.clear()
+        abundances_memory.extend(loaded_abundances)
+        sample_form.controls.clear()
+        new_sample_btn.disabled = False
+        export_btn.disabled = False
+        save_draft_btn.disabled = False
+        update_project_label()
+        refresh_sample_list()
+        page.snack_bar = ft.SnackBar(
+            ft.Text(
+                f"Draft loaded for project '{current_project['name']}'. "
+                f"{len(samples_memory)} sample(s) ready for input."
+            ),
+            duration=3000,
+        )
+        page.snack_bar.open = True
+        page.update()
+
+    async def save_draft_clicked(e):
+        if not samples_memory:
+            show_dialog("No Samples", "There are no saved samples to save as a draft.")
+            return
+
+        project_prefix = sanitize_filename_prefix(current_project["name"])
+        payload = build_draft_payload(current_project["name"], samples_memory, abundances_memory)
+        draft_text = json.dumps(payload, ensure_ascii=False, indent=2)
+        draft_bytes = draft_text.encode("utf-8")
+
+        try:
+            save_path = await draft_file_picker.save_file(
+                dialog_title="Save NemaDB Draft",
+                file_name=f"{project_prefix}{DRAFT_FILE_EXTENSION}",
+                initial_directory=str(Path.home()),
+                file_type=ft.FilePickerFileType.CUSTOM,
+                allowed_extensions=[DRAFT_FILE_EXTENSION.lstrip(".")],
+                src_bytes=draft_bytes,
+            )
+        except Exception as ex:
+            show_dialog("Save Draft Failed", f"Could not open the save dialog.\nError: {ex}")
+            return
+
+        if not save_path:
+            return
+
+        draft_path = Path(save_path)
+        if draft_path.suffix.lower() != DRAFT_FILE_EXTENSION:
+            if draft_path.suffix:
+                draft_path = draft_path.with_suffix(draft_path.suffix + DRAFT_FILE_EXTENSION)
+            else:
+                draft_path = draft_path.with_suffix(DRAFT_FILE_EXTENSION)
+
+        try:
+            draft_path.write_text(draft_text, encoding="utf-8")
+            page.snack_bar = ft.SnackBar(
+                ft.Text(f"Draft saved to: {draft_path.resolve()}"), duration=3000
+            )
+            page.snack_bar.open = True
+        except (OSError, PermissionError, IOError) as ex:
+            show_dialog("Save Draft Failed", f"Could not save the draft file.\nError: {ex}")
+
+        page.update()
+
+    async def load_draft_clicked(e):
+        try:
+            files = await draft_file_picker.pick_files(
+                dialog_title="Load NemaDB Draft",
+                initial_directory=str(Path.home()),
+                file_type=ft.FilePickerFileType.CUSTOM,
+                allowed_extensions=[DRAFT_FILE_EXTENSION.lstrip(".")],
+                allow_multiple=False,
+                with_data=True,
+            )
+        except Exception as ex:
+            show_dialog("Load Draft Failed", f"Could not open the file dialog.\nError: {ex}")
+            return
+
+        if not files:
+            return
+
+        selected_file = files[0]
+        try:
+            if selected_file.bytes is not None:
+                draft_text = selected_file.bytes.decode("utf-8-sig")
+            elif selected_file.path:
+                draft_text = Path(selected_file.path).read_text(encoding="utf-8-sig")
+            else:
+                raise ValueError("The selected file could not be read.")
+            payload = json.loads(draft_text)
+            loaded_project_name, loaded_samples, loaded_abundances = parse_draft_payload(payload)
+        except json.JSONDecodeError as ex:
+            show_dialog("Invalid Draft File", f"The selected file is not valid JSON.\nError: {ex}")
+            return
+        except (OSError, PermissionError, IOError, UnicodeDecodeError, ValueError) as ex:
+            show_dialog("Invalid Draft File", str(ex))
+            return
+
+        has_current_data = bool(samples_memory or abundances_memory or sample_form.controls)
+        if not has_current_data:
+            apply_loaded_draft(loaded_project_name, loaded_samples, loaded_abundances)
+            return
+
+        def on_confirm_load(event):
+            dlg.open = False
+            page.update()
+            apply_loaded_draft(loaded_project_name, loaded_samples, loaded_abundances)
+
+        def on_cancel_load(event):
+            dlg.open = False
+            page.update()
+
+        dlg = ft.AlertDialog(
+            title=ft.Text("Load Draft"),
+            content=ft.Text(
+                "Loading a draft will replace the current input data and any unsaved form changes. Continue?"
+            ),
+            actions=[
+                ft.TextButton("Cancel", on_click=on_cancel_load),
+                ft.TextButton("Load Draft", on_click=on_confirm_load),
+            ],
+        )
+        page.overlay.append(dlg)
+        dlg.open = True
+        page.update()
+
+    save_draft_btn.on_click = lambda e: page.run_task(save_draft_clicked, e)
+    load_draft_btn.on_click = lambda e: page.run_task(load_draft_clicked, e)
+
     # ---- 导出功能 ----
     def setup_export_button(page, samples_memory, abundances_memory):
+        picker = ft.FilePicker()
+        page.services.append(picker)
+
         async def export_clicked(e):
-            picker = ft.FilePicker()
             folder_path = await picker.get_directory_path(
                 dialog_title="Select Export Folder",
                 initial_directory=str(Path.home())
@@ -818,15 +1122,16 @@ def main(page: ft.Page):
                 return
 
             out_dir = Path(folder_path)
+            project_prefix = sanitize_filename_prefix(current_project["name"])
             try:
-                total_file = out_dir / "total_abundance.csv"
+                total_file = out_dir / f"{project_prefix}_total_abundance.csv"
                 with open(total_file, "w", newline="", encoding="utf-8") as f:
                     writer = csv.writer(f)
                     writer.writerow(["SampleID", "Abundance"])
                     for name, abund in samples_memory.items():
                         writer.writerow([name, abund])
 
-                genus_file = out_dir / "genus_abundance.csv"
+                genus_file = out_dir / f"{project_prefix}_genus_abundance.csv"
                 all_genera = sorted({la for _, la, _ in abundances_memory})
                 sample_data = {}
                 for sname, la, abund in abundances_memory:
@@ -860,8 +1165,9 @@ def main(page: ft.Page):
     # ---- Input 页面布局 ----
     input_page = ft.Column([
         ft.Text("Input Data", theme_style=ft.TextThemeStyle.HEADLINE_MEDIUM),
+        project_name_text,
         ft.Divider(),
-        ft.Row([new_project_btn, new_sample_btn, export_btn]),
+        ft.Row([new_project_btn, new_sample_btn, save_draft_btn, load_draft_btn, export_btn], wrap=True),
         ft.Divider(height=10),
         ft.Text("Saved Samples", theme_style=ft.TextThemeStyle.TITLE_SMALL),
         ft.Container(
@@ -890,7 +1196,7 @@ def main(page: ft.Page):
         ft.Text("• Click a suggestion to fill the field, then press 'Search' to see all matching records in a table."),
         ft.Container(height=10),
         ft.Text("📥 Input", theme_style=ft.TextThemeStyle.TITLE_SMALL),
-        ft.Text("1. Start by clicking 'New Project' (this clears any previously entered data)."),
+        ft.Text("1. Start by clicking 'New Project' and entering a project name (this clears any previously entered data)."),
         ft.Text("2. Click 'New Sample' to open the input form."),
         ft.Text("3. Enter a Sample Name and Total Abundance (total count of nematodes)."),
         ft.Text("4. For each genus found in the sample, fill in a row:"),
@@ -902,11 +1208,15 @@ def main(page: ft.Page):
         ft.Text("7. Saved samples appear in the list above; click on a sample to edit it."),
         ft.Text("8. Click the red trash icon on a sample card to delete it (with confirmation)."),
         ft.Container(height=10),
+        ft.Text("🗂 Drafts", theme_style=ft.TextThemeStyle.TITLE_SMALL),
+        ft.Text("• Click 'Save Draft' to save the added samples as a .nemadb draft file prefixed with the project name."),
+        ft.Text("• Click 'Load Draft' and choose a .nemadb file to restore the project name and samples, then continue input."),
+        ft.Container(height=10),
         ft.Text("💾 Export", theme_style=ft.TextThemeStyle.TITLE_SMALL),
-        ft.Text("• Click 'Export' and choose a folder. Two CSV files will be saved there:"),
-        ft.Text("   - total_abundance.csv: SampleID, Abundance"),
+        ft.Text("• Click 'Export' and choose a folder. Two project-prefixed CSV files will be saved there:"),
+        ft.Text("   - <project>_total_abundance.csv: SampleID, Abundance"),
         ft.Text(
-            "   - genus_abundance.csv: A table with SampleID as rows and genus (Latin names) as columns, abundances filled in."),
+            "   - <project>_genus_abundance.csv: A table with SampleID as rows and genus (Latin names) as columns, abundances filled in."),
         ft.Container(height=10),
         ft.Text("📄 Data source", theme_style=ft.TextThemeStyle.TITLE_SMALL),
         ft.Text("• The reference data is loaded from 'nematode.info.csv'."),
