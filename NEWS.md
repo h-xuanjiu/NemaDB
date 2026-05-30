@@ -1,5 +1,24 @@
 # NemaDB News
 
+## Version 1.2.0 (2026-05-28)
+
+### New Features
+
+- **Search Pagination** – Show search results in pages of 50 rows for smoother browsing
+- **Inline Search Action** – Move the search action beside the keyword field
+- **Project Rename** – Edit the current project name without clearing saved samples
+- **Data Submission** – Add a Help page form for submitting missing or supplemental nematode data by email template
+- **Submission Validation** – Validate required fields, email format, CP integers, and mass numeric values
+- **Help Page Refresh** – Reorganize Help content into clearer sections covering Search, Input, Drafts, Export, Submit Data, and Data Source
+- **Reference Data Update** – Added Chinese genus names for selected nematodes and filled in expected family average mass values
+
+### Files
+
+- `main.py` – Added search pagination, project rename, data submission, validation, and updated Help layout
+- `nematode.info.csv` – Added selected Chinese genus names and completed family average mass values
+- `pyproject.toml` – Updated project and build versions to 1.2.0
+- `NEWS.md` – Added release notes for version 1.2.0
+
 ## Version 1.1.0 (2026-05-10)
 
 ### New Features

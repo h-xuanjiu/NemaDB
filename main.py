@@ -1,5 +1,6 @@
 import csv
 import json
+import urllib.parse
 from pathlib import Path
 import flet as ft
 import sys
@@ -235,11 +236,50 @@ def main(page: ft.Page):
         data_row_min_height=36,
         column_spacing=20,
     )
+    SEARCH_PAGE_SIZE = 50
+    search_results = {"rows": [], "page": 0}
+    result_summary = ft.Text("No results yet.", color=ft.Colors.GREY_600)
+    prev_page_btn = ft.Button("Previous", icon=ft.Icons.CHEVRON_LEFT, disabled=True)
+    next_page_btn = ft.Button("Next", icon=ft.Icons.CHEVRON_RIGHT, disabled=True)
+    page_indicator = ft.Text("Page 0 / 0", color=ft.Colors.GREY_700)
+    pagination_row = ft.Row(
+        [prev_page_btn, page_indicator, next_page_btn],
+        alignment=ft.MainAxisAlignment.END,
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        wrap=True,
+    )
     table_area = ft.Column(
         [ft.Row([result_table], scroll="auto")],
         scroll=ft.ScrollMode.AUTO,
         expand=True,
     )
+
+    def render_search_page():
+        matched = search_results["rows"]
+        total = len(matched)
+        if not total:
+            result_table.rows = []
+            result_summary.value = "No matching records."
+            page_indicator.value = "Page 0 / 0"
+            prev_page_btn.disabled = True
+            next_page_btn.disabled = True
+            return
+
+        max_page = (total - 1) // SEARCH_PAGE_SIZE
+        search_results["page"] = max(0, min(search_results["page"], max_page))
+        current_page = search_results["page"]
+        start = current_page * SEARCH_PAGE_SIZE
+        end = min(start + SEARCH_PAGE_SIZE, total)
+        visible_rows = matched[start:end]
+
+        result_table.rows = [
+            ft.DataRow(cells=[ft.DataCell(ft.Text(cell)) for cell in row])
+            for row in visible_rows
+        ]
+        result_summary.value = f"Showing {start + 1}-{end} of {total} result(s)."
+        page_indicator.value = f"Page {current_page + 1} / {max_page + 1}"
+        prev_page_btn.disabled = current_page == 0
+        next_page_btn.disabled = current_page >= max_page
 
     def on_keyword_change(text):
         text = text.strip().lower()
@@ -284,28 +324,62 @@ def main(page: ft.Page):
         suggestion_container.height = 0
         suggestion_list.controls.clear()
         if not keyword:
+            search_results["rows"] = []
+            search_results["page"] = 0
+            result_table.rows = []
+            result_summary.value = "No results yet."
+            page_indicator.value = "Page 0 / 0"
+            prev_page_btn.disabled = True
+            next_page_btn.disabled = True
+            page.update()
             return
         col_idx = SEARCH_COLUMNS[col_dropdown.value]
         keyword_lower = keyword.lower()
-        matched = [row for row in ALL_ROWS if keyword_lower in row[col_idx].lower()]
-        result_table.rows = [
-            ft.DataRow(cells=[ft.DataCell(ft.Text(cell)) for cell in row])
-            for row in matched
-        ]
+        search_results["rows"] = [row for row in ALL_ROWS if keyword_lower in row[col_idx].lower()]
+        search_results["page"] = 0
+        render_search_page()
         page.update()
 
-    search_btn = ft.Button("Search", icon=ft.Icons.FIND_IN_PAGE, on_click=do_search)
+    search_btn = ft.IconButton(
+        icon=ft.Icons.FIND_IN_PAGE,
+        tooltip="Search",
+        on_click=do_search,
+    )
+    search_input_row = ft.Row(
+        [keyword_field, search_btn],
+        spacing=6,
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+    )
+
+    def go_to_previous_page(e):
+        search_results["page"] -= 1
+        render_search_page()
+        page.update()
+
+    def go_to_next_page(e):
+        search_results["page"] += 1
+        render_search_page()
+        page.update()
+
+    prev_page_btn.on_click = go_to_previous_page
+    next_page_btn.on_click = go_to_next_page
+
     search_page = ft.Column([
         ft.Text("Search Nematode Data", theme_style=ft.TextThemeStyle.HEADLINE_MEDIUM),
         ft.Divider(),
         ft.ResponsiveRow([
-            ft.Column([col_dropdown], col={"xs": 12, "sm": 4, "md": 3}),
-            ft.Column([keyword_field], col={"xs": 12, "sm": 8, "md": 9}),
+            ft.Column([col_dropdown], col={"xs": 12, "sm": 3, "md": 2}),
+            ft.Column([search_input_row], col={"xs": 12, "sm": 9, "md": 10}),
         ]),
         suggestion_container,
-        ft.Row([search_btn], alignment=ft.MainAxisAlignment.END),
         ft.Divider(),
         ft.Text("Results:", theme_style=ft.TextThemeStyle.TITLE_SMALL),
+        ft.Row(
+            [result_summary, pagination_row],
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            wrap=True,
+        ),
         table_area,
     ], expand=True, spacing=10)
 
@@ -315,7 +389,31 @@ def main(page: ft.Page):
     save_draft_btn = ft.Button("Save Draft", icon=ft.Icons.SAVE, disabled=True)
     load_draft_btn = ft.Button("Load Draft", icon=ft.Icons.UPLOAD_FILE)
     current_project = {"name": ""}
-    project_name_text = ft.Text("Project: not created", color=ft.Colors.GREY_600)
+    project_name_text = ft.Text(
+        "Project: not created",
+        color=ft.Colors.GREY_600,
+        size=20,
+        weight=ft.FontWeight.BOLD,
+    )
+    edit_project_btn = ft.IconButton(
+        icon=ft.Icons.EDIT,
+        tooltip="Edit project name",
+        disabled=True,
+    )
+    project_header = ft.Container(
+        content=ft.Row(
+            [ft.Icon(ft.Icons.FOLDER_OPEN, color=ft.Colors.BLUE_GREY_600),
+             project_name_text,
+             edit_project_btn],
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            wrap=True,
+        ),
+        bgcolor=ft.Colors.BLUE_GREY_50,
+        border=ft.Border.all(1, ft.Colors.BLUE_GREY_100),
+        border_radius=8,
+        padding=ft.Padding.symmetric(horizontal=14, vertical=10),
+    )
     sample_form = ft.Column()
     sample_list_view = ft.ListView(spacing=8, padding=10, expand=True)
 
@@ -341,9 +439,11 @@ def main(page: ft.Page):
         if current_project["name"]:
             project_name_text.value = f"Project: {current_project['name']}"
             project_name_text.color = ft.Colors.BLUE_GREY_700
+            edit_project_btn.disabled = False
         else:
             project_name_text.value = "Project: not created"
             project_name_text.color = ft.Colors.GREY_600
+            edit_project_btn.disabled = True
 
     # ---- 样本列表操作 ----
     def delete_sample(name):
@@ -702,6 +802,52 @@ def main(page: ft.Page):
         page.update()
 
     new_project_btn = ft.Button("New Project", icon=ft.Icons.CREATE_NEW_FOLDER, on_click=new_project)
+
+    def edit_project_name(e):
+        if not current_project["name"]:
+            return
+
+        project_name_field = ft.TextField(
+            label="Project Name",
+            value=current_project["name"],
+            autofocus=True,
+            width=360,
+        )
+
+        def on_cancel(event):
+            dlg.open = False
+            page.update()
+
+        def on_save(event):
+            new_name = project_name_field.value.strip()
+            if not new_name:
+                project_name_field.error_text = "Please enter a project name."
+                page.update()
+                return
+            old_name = current_project["name"]
+            current_project["name"] = new_name
+            update_project_label()
+            dlg.open = False
+            page.snack_bar = ft.SnackBar(
+                ft.Text(f"Project renamed from '{old_name}' to '{new_name}'."),
+                duration=3000,
+            )
+            page.snack_bar.open = True
+            page.update()
+
+        dlg = ft.AlertDialog(
+            title=ft.Text("Edit Project Name"),
+            content=project_name_field,
+            actions=[
+                ft.TextButton("Cancel", on_click=on_cancel),
+                ft.TextButton("Save", on_click=on_save),
+            ],
+        )
+        page.overlay.append(dlg)
+        dlg.open = True
+        page.update()
+
+    edit_project_btn.on_click = edit_project_name
 
     # ---- 新增样本 ----
     def start_new_sample(e):
@@ -1162,10 +1308,213 @@ def main(page: ft.Page):
 
     setup_export_button(page, samples_memory, abundances_memory)
 
+    # ---- 数据提交邮件草稿 ----
+    SUBMISSION_EMAIL = "heyuxuan0525@outlook.com"
+    url_launcher = ft.UrlLauncher()
+    page.services.append(url_launcher)
+    clipboard = ft.Clipboard()
+
+    def show_snackbar(message):
+        snackbar = ft.SnackBar(ft.Text(message), duration=3000)
+        page.overlay.append(snackbar)
+        snackbar.open = True
+        page.update()
+
+    def open_submission_dialog(e):
+        field_specs = [
+            ("Your name", "your_name", False, False),
+            ("Email", "email", False, False),
+            ("Institution / Lab", "institution_lab", False, False),
+            ("Genus(zh)", "genus_zh", False, False),
+            ("Genus(la) *", "genus_la", True, False),
+            ("Taxonomy (or only Family) *", "taxonomy", True, False),
+            ("Feeding", "feeding", False, False),
+            ("CP", "cp", False, False),
+            ("Genus.Average.Mass", "genus_average_mass", False, False),
+            ("Family.Average.Mass", "family_average_mass", False, False),
+            ("Reference / source *", "reference_source", True, True),
+            ("Notes", "notes", False, True),
+        ]
+        fields = {}
+        for label, key, _, multiline in field_specs:
+            fields[key] = ft.TextField(
+                label=label,
+                multiline=multiline,
+                min_lines=2 if multiline else None,
+                max_lines=4 if multiline else None,
+            )
+        validation_summary = ft.Text(
+            "",
+            color=ft.Colors.RED,
+            weight=ft.FontWeight.BOLD,
+            visible=False,
+        )
+
+        def validate_fields():
+            is_valid = True
+
+            def set_field_error(field, message=None):
+                field.error_text = message
+                field.border_color = ft.Colors.RED if message else None
+                field.focused_border_color = ft.Colors.RED if message else None
+
+            for _, key, required, _ in field_specs:
+                field = fields[key]
+                if required and not (field.value or "").strip():
+                    set_field_error(field, "Required")
+                    is_valid = False
+                else:
+                    set_field_error(field)
+
+            email_value = (fields["email"].value or "").strip()
+            if email_value:
+                email_parts = email_value.split("@")
+                if (
+                    len(email_parts) != 2
+                    or not email_parts[0]
+                    or "." not in email_parts[1]
+                    or email_parts[1].startswith(".")
+                    or email_parts[1].endswith(".")
+                ):
+                    set_field_error(fields["email"], "Enter a valid email address")
+                    is_valid = False
+
+            cp_value = (fields["cp"].value or "").strip()
+            if cp_value:
+                try:
+                    int(cp_value)
+                except ValueError:
+                    set_field_error(fields["cp"], "Enter an integer")
+                    is_valid = False
+
+            for key in ["genus_average_mass", "family_average_mass"]:
+                mass_value = (fields[key].value or "").strip()
+                if mass_value:
+                    try:
+                        float(mass_value)
+                    except ValueError:
+                        set_field_error(fields[key], "Enter a number")
+                        is_valid = False
+            validation_summary.value = "Please fix the highlighted fields before submitting."
+            validation_summary.visible = not is_valid
+            page.update()
+            return is_valid
+
+        def build_email_parts():
+            values = {key: (field.value or "").strip() for key, field in fields.items()}
+            subject_genus = values["genus_la"] or "New record"
+            subject = f"NemaDB Data Submission - {subject_genus}"
+            body = "\n".join([
+                "NemaDB Data Submission",
+                "",
+                "Contributor",
+                f"Your name: {values['your_name']}",
+                f"Email: {values['email']}",
+                f"Institution / Lab: {values['institution_lab']}",
+                "",
+                "Data",
+                f"Genus(zh): {values['genus_zh']}",
+                f"Genus(la): {values['genus_la']}",
+                f"Taxonomy (or only Family): {values['taxonomy']}",
+                f"Feeding: {values['feeding']}",
+                f"CP: {values['cp']}",
+                f"Genus.Average.Mass: {values['genus_average_mass']}",
+                f"Family.Average.Mass: {values['family_average_mass']}",
+                f"Reference / source: {values['reference_source']}",
+                f"Notes: {values['notes']}",
+                "",
+                f"Submitted from NemaDB version: {version}",
+            ])
+            return subject, body
+
+        async def open_email_draft(event):
+            if not validate_fields():
+                return
+            subject, body = build_email_parts()
+            mailto_url = (
+                f"mailto:{SUBMISSION_EMAIL}?"
+                + urllib.parse.urlencode(
+                    {"subject": subject, "body": body},
+                    quote_via=urllib.parse.quote,
+                )
+            )
+            try:
+                await url_launcher.launch_url(mailto_url)
+            except Exception as ex:
+                show_dialog(
+                    "Could Not Open Email",
+                    "NemaDB could not open your default email app.\n"
+                    "Please use 'Copy Email Template' instead.\n\n"
+                    f"Error: {ex}",
+                )
+
+        async def copy_email_template(event):
+            if not validate_fields():
+                return
+            subject, body = build_email_parts()
+            template = "\n".join([
+                f"To: {SUBMISSION_EMAIL}",
+                f"Subject: {subject}",
+                "",
+                body,
+            ])
+            await clipboard.set(template)
+            show_snackbar("Email template copied to clipboard.")
+
+        def close_dialog(event):
+            page.pop_dialog()
+
+        form = ft.Column(
+            [
+                ft.Text("Contributor", theme_style=ft.TextThemeStyle.TITLE_SMALL),
+                fields["your_name"],
+                fields["email"],
+                fields["institution_lab"],
+                ft.Divider(),
+                ft.Text("Data", theme_style=ft.TextThemeStyle.TITLE_SMALL),
+                fields["genus_zh"],
+                fields["genus_la"],
+                fields["taxonomy"],
+                ft.ResponsiveRow([
+                    ft.Column([fields["feeding"]], col={"xs": 12, "sm": 6}),
+                    ft.Column([fields["cp"]], col={"xs": 12, "sm": 6}),
+                ]),
+                ft.ResponsiveRow([
+                    ft.Column([fields["genus_average_mass"]], col={"xs": 12, "sm": 6}),
+                    ft.Column([fields["family_average_mass"]], col={"xs": 12, "sm": 6}),
+                ]),
+                fields["reference_source"],
+                fields["notes"],
+                validation_summary,
+            ],
+            scroll=ft.ScrollMode.AUTO,
+            spacing=8,
+        )
+
+        dlg = ft.AlertDialog(
+            title=ft.Text("Submit Data"),
+            content=ft.Container(content=form, width=720, height=560),
+            actions=[
+                ft.TextButton("Cancel", on_click=close_dialog),
+                ft.Button("Copy Email Template", icon=ft.Icons.CONTENT_COPY,
+                          on_click=lambda event: page.run_task(copy_email_template, event)),
+                ft.Button("Open Email Draft", icon=ft.Icons.EMAIL,
+                          on_click=lambda event: page.run_task(open_email_draft, event)),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        page.show_dialog(dlg)
+
+    submit_data_btn = ft.Button(
+        "Submit Data",
+        icon=ft.Icons.EMAIL,
+        on_click=open_submission_dialog,
+    )
+
     # ---- Input 页面布局 ----
     input_page = ft.Column([
         ft.Text("Input Data", theme_style=ft.TextThemeStyle.HEADLINE_MEDIUM),
-        project_name_text,
+        project_header,
         ft.Divider(),
         ft.Row([new_project_btn, new_sample_btn, save_draft_btn, load_draft_btn, export_btn], wrap=True),
         ft.Divider(height=10),
@@ -1183,49 +1532,126 @@ def main(page: ft.Page):
     ], expand=True, scroll=ft.ScrollMode.AUTO)
 
     # ==================== Help Page ====================
+    def help_section(icon, title, lines):
+        return ft.Container(
+            content=ft.Column(
+                [
+                    ft.Row(
+                        [
+                            ft.Icon(icon, color=ft.Colors.BLUE_GREY_700),
+                            ft.Text(title, theme_style=ft.TextThemeStyle.TITLE_MEDIUM),
+                        ],
+                        spacing=8,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                    ft.Column(
+                        [ft.Text(line, color=ft.Colors.BLUE_GREY_800) for line in lines],
+                        spacing=5,
+                    ),
+                ],
+                spacing=8,
+            ),
+            bgcolor=ft.Colors.BLUE_GREY_50,
+            border=ft.Border.all(1, ft.Colors.BLUE_GREY_100),
+            border_radius=8,
+            padding=ft.Padding.symmetric(horizontal=14, vertical=12),
+        )
+
+    submit_data_panel = ft.Container(
+        content=ft.Column(
+            [
+                ft.Row(
+                    [
+                        ft.Icon(ft.Icons.EMAIL, color=ft.Colors.BLUE_GREY_700),
+                        ft.Text("Submit Data", theme_style=ft.TextThemeStyle.TITLE_MEDIUM),
+                    ],
+                    spacing=8,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
+                ft.Text(
+                    "If you notice missing or incomplete nematode records while using NemaDB, "
+                    "you can submit supplemental data for review.",
+                    color=ft.Colors.BLUE_GREY_800,
+                ),
+                ft.Text(
+                    "The form checks required fields and basic data types, then opens an email draft "
+                    "or copies a ready-to-send email template.",
+                    color=ft.Colors.BLUE_GREY_800,
+                ),
+                submit_data_btn,
+            ],
+            spacing=8,
+        ),
+        bgcolor=ft.Colors.BLUE_50,
+        border=ft.Border.all(1, ft.Colors.BLUE_100),
+        border_radius=8,
+        padding=ft.Padding.symmetric(horizontal=14, vertical=12),
+    )
+
     help_page = ft.Column([
         ft.Text("Help", theme_style=ft.TextThemeStyle.HEADLINE_MEDIUM),
-        ft.Divider(),
-        ft.Text("Welcome to NemaDB – a lightweight nematode data utility.",
-                theme_style=ft.TextThemeStyle.BODY_LARGE),
-        ft.Container(height=10),
-        ft.Text("🔍 Search", theme_style=ft.TextThemeStyle.TITLE_SMALL),
-        ft.Text("• Choose a column from the dropdown (Genus(zh), Genus(la), Family)."),
         ft.Text(
-            "• Start typing in the keyword field – a suggestion list will appear with the best matches (ordered by match position)."),
-        ft.Text("• Click a suggestion to fill the field, then press 'Search' to see all matching records in a table."),
-        ft.Container(height=10),
-        ft.Text("📥 Input", theme_style=ft.TextThemeStyle.TITLE_SMALL),
-        ft.Text("1. Start by clicking 'New Project' and entering a project name (this clears any previously entered data)."),
-        ft.Text("2. Click 'New Sample' to open the input form."),
-        ft.Text("3. Enter a Sample Name and Total Abundance (total count of nematodes)."),
-        ft.Text("4. For each genus found in the sample, fill in a row:"),
-        ft.Text(
-            "   - Type in Genus(zh) or Genus(la); as you type, matching suggestions will appear. Click a suggestion to select it – the other genus field will auto-fill."),
-        ft.Text("   - Enter the Abundance (count) for that genus."),
-        ft.Text("5. Use the '+' button to add more genus rows, and the trash icon to remove a row."),
-        ft.Text("6. After all genera are entered, click 'Add Sample' to save it to memory."),
-        ft.Text("7. Saved samples appear in the list above; click on a sample to edit it."),
-        ft.Text("8. Click the red trash icon on a sample card to delete it (with confirmation)."),
-        ft.Container(height=10),
-        ft.Text("🗂 Drafts", theme_style=ft.TextThemeStyle.TITLE_SMALL),
-        ft.Text("• Click 'Save Draft' to save the added samples as a .nemadb draft file prefixed with the project name."),
-        ft.Text("• Click 'Load Draft' and choose a .nemadb file to restore the project name and samples, then continue input."),
-        ft.Container(height=10),
-        ft.Text("💾 Export", theme_style=ft.TextThemeStyle.TITLE_SMALL),
-        ft.Text("• Click 'Export' and choose a folder. Two project-prefixed CSV files will be saved there:"),
-        ft.Text("   - <project>_total_abundance.csv: SampleID, Abundance"),
-        ft.Text(
-            "   - <project>_genus_abundance.csv: A table with SampleID as rows and genus (Latin names) as columns, abundances filled in."),
-        ft.Container(height=10),
-        ft.Text("📄 Data source", theme_style=ft.TextThemeStyle.TITLE_SMALL),
-        ft.Text("• The reference data is loaded from 'nematode.info.csv'."),
-        ft.Text("• Search and genus suggestions are based on this file."),
-        ft.Container(height=20),  # 一些间距
+            "NemaDB is a lightweight utility for searching nematode reference data and preparing "
+            "sample abundance files for downstream analysis.",
+            theme_style=ft.TextThemeStyle.BODY_LARGE,
+        ),
+        help_section(
+            ft.Icons.SEARCH,
+            "Search",
+            [
+                "Choose a search column: Genus(zh), Genus(la), or Family.",
+                "Type a keyword to see fuzzy-match suggestions, then select a suggestion or keep your own keyword.",
+                "Click the search icon at the right side of the keyword field to display matching records.",
+                "Results are paginated at 50 rows per page for smoother browsing.",
+            ],
+        ),
+        help_section(
+            ft.Icons.INPUT,
+            "Input Samples",
+            [
+                "Click New Project to create a project. This clears any current input data.",
+                "Use the edit icon beside the project name if you need to rename the project later.",
+                "Click New Sample, then enter Sample Name and Total Abundance.",
+                "For each genus, enter Genus(zh) or Genus(la); matching suggestions can auto-fill the paired name.",
+                "Enter abundance values, use + to add rows, and use the trash icon to remove rows.",
+                "Duplicate genus entries are detected, and you can merge duplicate rows before saving.",
+                "Saved samples appear in the list; click a sample card to edit it or use the red trash icon to delete it.",
+            ],
+        ),
+        help_section(
+            ft.Icons.SAVE,
+            "Drafts",
+            [
+                "Save Draft writes the current project and saved samples to a .nemadb draft file.",
+                "Load Draft restores a saved .nemadb file so you can continue editing later.",
+                "Loading a draft replaces the current input data after confirmation.",
+            ],
+        ),
+        help_section(
+            ft.Icons.DOWNLOAD,
+            "Export",
+            [
+                "Export asks you to choose an output folder.",
+                "NemaDB writes <project>_total_abundance.csv with SampleID and total abundance.",
+                "NemaDB also writes <project>_genus_abundance.csv with SampleID as rows and genus names as columns.",
+                "The project name is used as the filename prefix, so rename the project before exporting if needed.",
+            ],
+        ),
+        submit_data_panel,
+        help_section(
+            ft.Icons.INFO,
+            "Data Source",
+            [
+                "The built-in reference data is loaded from nematode.info.csv.",
+                "Search suggestions and genus name mapping are based on this file.",
+                "Submitted data is not added automatically; it should be reviewed before being included in future releases.",
+            ],
+        ),
         ft.Container(
-            content=ft.Text(f"Version: {version}", italic=True, color=ft.Colors.GREY_500)
-        )
-    ], expand=True, scroll=ft.ScrollMode.AUTO)
+            content=ft.Text(f"Version: {version}", italic=True, color=ft.Colors.GREY_500),
+            padding=ft.Padding.symmetric(vertical=8, horizontal=0),
+        ),
+    ], expand=True, scroll=ft.ScrollMode.AUTO, spacing=12)
 
 
 
