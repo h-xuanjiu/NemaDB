@@ -1,5 +1,24 @@
 # NemaDB News
 
+## Version 1.3.0 (2026-09-28)
+
+### New Features
+
+- **Flet 1.0.1 Upgrade** – Upgrade the application framework to Flet 1.0.1
+- **Non-ASCII Path Support** – Removed the custom build template because Flet 1.0.1 now supports project paths containing non-ASCII characters
+- **UI Refresh** – Comprehensively redesign and optimize the interface, layout, spacing, typography, and visual hierarchy
+- **Chinese Interface** – Add Chinese localization and an English/Chinese language switch
+- **Temporary Application Icon** – Add a custom temporary SVG icon for the sidebar brand area and welcome dialog
+
+### Files
+
+- `main.py` – Updated the interface, localization integration, typography, validation behavior, and application branding
+- `i18n.py` – Added English-to-Chinese interface translations and dynamic localization rules
+- `assets/nemadb-mark.svg` – Added the temporary NemaDB vector icon
+- `pyproject.toml` – Updated the project to version 1.3.0, pinned Flet 1.0.1, and restored the official Flet build workflow
+- `flet_build_template/` – Removed the legacy custom build template because it is no longer required with Flet 1.0.1
+- `NEWS.md` – Added release notes for version 1.3.0
+
 ## Version 1.2.0 (2026-05-28)
 
 ### New Features

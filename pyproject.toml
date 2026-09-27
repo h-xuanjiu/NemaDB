@@ -1,10 +1,10 @@
 [project]
 name = "NemaDB"
-version = "1.2.0"
+version = "1.3.0"
 description = "NemaDB"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
-    "flet",
+    "flet==1.0.1",
 ]
 
 [tool.flet.app]
@@ -12,6 +12,7 @@ path = "."
 module = "main"
 exclude = [
     ".git",
+    ".flet",
     ".venv",
     "__pycache__",
     "*.pyc",
@@ -24,9 +25,9 @@ company = "NemaDB"
 copyright = "Copyright (C) 2026 NemaDB"
 
 [tool.flet.template]
-url = "./flet_build_template"
+# url = "./flet_build_template"
 
 [tool.flet.build]
-file_version = "1.2.0.0"
-product_version = "1.2.0.0"
+file_version = "1.3.0.0"
+product_version = "1.3.0.0"
 product_name = "NemaDB"
