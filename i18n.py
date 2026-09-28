@@ -29,6 +29,28 @@ ZH_TRANSLATIONS = {
     "Previous": "上一页",
     "Next": "下一页",
     "Search": "搜索",
+    "Batch search": "批量查询",
+    "Batch search and pair check": "批量查询与配对核验",
+    "Genus list A": "属名列表 A",
+    "Genus list B": "属名列表 B",
+    "Smart split: spaces, tabs, line breaks, commas, semicolons, and more can be mixed.": "智能分割：空格、制表符、换行、逗号、分号等可以混用。",
+    "Enter at least one Chinese or Latin genus name.": "请至少输入一个中文或拉丁属名。",
+    "Search / compare": "查询 / 核验",
+    "Query": "输入项",
+    "Status": "状态",
+    "Matched": "已匹配",
+    "Not found": "未查到",
+    "Pair": "配对序号",
+    "Source": "来源",
+    "Chinese input": "中文输入",
+    "Latin input": "拉丁文输入",
+    "Matched pair": "对应正确",
+    "Mismatch": "对应错误",
+    "Chinese not found": "中文名未收录",
+    "Latin not found": "拉丁名未收录",
+    "Counterpart not found": "另一项未收录",
+    "Missing list A": "列表 A 缺少对应项",
+    "Missing list B": "列表 B 缺少对应项",
     "Find a record": "查找记录",
     "Search the local reference database by Chinese genus, Latin genus, or family.": "按中文属名、拉丁属名或科名检索本地参考数据库。",
     "Results": "检索结果",
@@ -38,6 +60,8 @@ ZH_TRANSLATIONS = {
     "No results to copy.": "没有可复制的结果。",
     "No results to download.": "没有可下载的结果。",
     "Save query results": "保存查询结果",
+    "Save batch query results": "保存批量查询结果",
+    "Save pair comparison results": "保存配对核验结果",
     "Save all database records": "保存全部数据库记录",
     "CSV download started.": "CSV 下载已开始。",
     "Download Failed": "下载失败",
@@ -139,6 +163,12 @@ ZH_TRANSLATIONS = {
     "Choose a search column: Genus(zh), Genus(la), or Family.": "选择检索字段：中文属名、拉丁属名或科名。",
     "Type a keyword to see fuzzy-match suggestions, then select a suggestion or keep your own keyword.": "输入关键词查看模糊匹配建议，可选择建议或保留自行输入的内容。",
     "Click the search icon at the right side of the keyword field to display matching records.": "点击关键词输入框右侧的搜索按钮以显示匹配记录。",
+    "Both boxes accept mixed Chinese and Latin genus names; results automatically separate them into Chinese and Latin columns.": "两个输入框均可混合填写中文和拉丁属名；结果会自动将它们分别整理到中文列和拉丁文列。",
+    "Smart splitting accepts mixed whitespace, punctuation, and zero-width characters from copied text.": "智能分割支持混用空白符、标点符号，以及复制文本中的零宽字符。",
+    "Fill both boxes to compare items positionally, or fill only one box for a regular batch search.": "两侧均有内容时按顺序配对核验；只填写一侧时执行普通批量查询。",
+    "Matched pairs are shown once with the full standard database record.": "对应正确的项目显示为一行，并附带完整的数据库标准记录。",
+    "Unmatched pairs are split into one row per input; extra items also include any database record found.": "未对应的项目按每个输入分别显示一行；数量多出的一侧也会附带查到的数据库记录。",
+    "Batch search ignores letter case for Latin names, accepts Chinese names without the final 属, and keeps unmatched names as Not found rows.": "批量查询拉丁属名时不区分大小写，中文属名可省略末尾的“属”字；未匹配的名称会保留并标记为“未查到”。",
     "Results are paginated at 50 rows per page for smoother browsing.": "结果每页显示 50 条，以便流畅浏览。",
     "Select text directly in the table, or use Copy results to copy the complete matched dataset.": "可直接选中表格文字，或使用“复制结果”复制完整匹配数据集。",
     "Use Download CSV to save all matched rows, not only the current page.": "使用“下载 CSV”可保存全部匹配记录，而不只是当前页。",
@@ -208,6 +238,20 @@ def translate_text(value, language="en"):
         (
             r"Showing (\d+)-(\d+) of (\d+) result\(s\)\.",
             lambda m: f"显示第 {m.group(1)}–{m.group(2)} 条，共 {m.group(3)} 条。",
+        ),
+        (
+            r"(\d+) of (\d+) queries matched · (\d+) not found · (\d+) result row\(s\)\.",
+            lambda m: (
+                f"{m.group(2)} 个输入项中已匹配 {m.group(1)} 个 · "
+                f"未查到 {m.group(3)} 个 · 共 {m.group(4)} 行结果"
+            ),
+        ),
+        (
+            r"(\d+) of (\d+) pairs matched · (\d+) issue\(s\)\.",
+            lambda m: (
+                f"{m.group(2)} 对中有 {m.group(1)} 对对应正确 · "
+                f"{m.group(3)} 项需检查"
+            ),
         ),
         (r"([\d,]+) records", lambda m: f"{m.group(1)} 条记录"),
         (

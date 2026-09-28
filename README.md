@@ -11,6 +11,7 @@ A lightweight nematode data utility built with [Flet](https://flet.dev/).
 ## Features
 
 - **🔍 Search** – Search by Genus (Chinese/Latin) or Family with live suggestions
+- **📚 Batch search & pair check** – Compare mixed-language lists with full standard records: matched pairs use one row, while mismatches split into per-input diagnostic rows
 - **📋 Copy & download** – Select table text, copy complete result sets, or export them as CSV
 - **🗃️ Full database view** – Open the record-count badge to browse and download all records
 - **📥 Input** – Create samples and record genus abundances with auto-complete

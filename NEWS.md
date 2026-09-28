@@ -1,5 +1,23 @@
 # NemaDB News
 
+## Version 1.5.0 (2026-09-29)
+
+### New Features
+
+- **Batch Genus Search** – Search multiple mixed Chinese and Latin genus names at once, with case-insensitive Latin matching, optional trailing 属 for Chinese names, and explicit not-found markers
+- **Smart Input Splitting** – Accept mixed line breaks, spaces, tabs, common Chinese or English punctuation, and zero-width characters in pasted lists
+- **Positional Pair Check** – Compare two mixed-language lists in order, show matched standard Chinese and Latin names with their complete records, and split mismatches into per-input detail rows
+- **Unequal List Handling** – Mark unpaired extra items while retaining any corresponding database information that can be found
+- **Persistent Search on Language Switch** – Keep the selected field, keyword, batch inputs, result set, result mode, and current result page when switching between English and Chinese
+
+### Files
+
+- `main.py` – Added intelligent batch parsing, genus lookup and positional comparison, detailed result tables, CSV export support, and persistent Search-page state across language switches
+- `i18n.py` – Added Chinese translations for the batch-search interface, comparison statuses, help content, and dynamic result summaries
+- `pyproject.toml` – Updated project and Windows build versions to 1.5.0
+- `README.md` – Documented batch search and pair checking
+- `NEWS.md` – Added release notes for version 1.5.0
+
 ## Version 1.4.0 (2026-09-28)
 
 ### New Features

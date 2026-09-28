@@ -4,6 +4,7 @@ import csv
 import io
 import json
 import math
+import re
 import urllib.parse
 from pathlib import Path
 import flet as ft
@@ -85,11 +86,252 @@ for row in ALL_ROWS:
 ALL_ZH = sorted(ZH_TO_LA.keys())
 ALL_LA = sorted({row[1].strip() for row in ALL_ROWS if row[1].strip()})
 
+BATCH_SEARCH_HEADERS = ["Query", "Status", *HEADERS]
+PAIR_COMPARISON_HEADERS = [
+    "Pair",
+    "Source",
+    "Chinese input",
+    "Latin input",
+    "Status",
+    *HEADERS,
+]
+BATCH_QUERY_SEPARATOR_PATTERN = re.compile(
+    r"[\s\u00ad\u180e\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff,，;；、:：|｜/\\·•]+"
+)
+CJK_CHARACTER_PATTERN = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
+
+
+def parse_batch_queries(raw_text, deduplicate=True):
+    """Smart-split pasted genus names and optionally deduplicate in input order."""
+    queries = []
+    seen = set()
+    for value in BATCH_QUERY_SEPARATOR_PATTERN.split(raw_text or ""):
+        query = value.strip().strip("\"'“”‘’()[]{}<>《》")
+        normalized = query.casefold()
+        if query and (not deduplicate or normalized not in seen):
+            queries.append(query)
+            seen.add(normalized)
+    return queries
+
+
+def build_genus_exact_lookup(rows, column_indices=(0, 1)):
+    """Index Latin names case-insensitively and Chinese names with optional 属."""
+    lookup = {}
+    for row in rows:
+        for column_index in column_indices:
+            genus_name = row[column_index].strip()
+            if not genus_name:
+                continue
+            lookup_keys = [genus_name.casefold()]
+            if column_index == 0 and genus_name.endswith("属"):
+                short_name = genus_name[:-1].strip().casefold()
+                if short_name:
+                    lookup_keys.append(short_name)
+            for lookup_key in lookup_keys:
+                matches = lookup.setdefault(lookup_key, [])
+                if row not in matches:
+                    matches.append(row)
+    return lookup
+
+
+GENUS_EXACT_LOOKUP = build_genus_exact_lookup(ALL_ROWS)
+ZH_GENUS_EXACT_LOOKUP = build_genus_exact_lookup(ALL_ROWS, (0,))
+LA_GENUS_EXACT_LOOKUP = build_genus_exact_lookup(ALL_ROWS, (1,))
+
+
+def build_batch_search_rows(raw_text):
+    """Return query-preserving batch rows, including explicit not-found markers."""
+    queries = parse_batch_queries(raw_text)
+    result_rows = []
+    matched_query_count = 0
+    for query in queries:
+        matches = GENUS_EXACT_LOOKUP.get(query.casefold(), [])
+        if matches:
+            matched_query_count += 1
+            result_rows.extend([[query, "Matched", *row] for row in matches])
+        else:
+            result_rows.append([query, "Not found", *([""] * len(HEADERS))])
+    return queries, result_rows, matched_query_count
+
+
+def classify_genus_query(query):
+    """Classify a query as Chinese or Latin, preferring database evidence."""
+    normalized = query.casefold()
+    chinese_matches = ZH_GENUS_EXACT_LOOKUP.get(normalized, [])
+    latin_matches = LA_GENUS_EXACT_LOOKUP.get(normalized, [])
+    if chinese_matches and not latin_matches:
+        return "zh"
+    if latin_matches and not chinese_matches:
+        return "la"
+    return "zh" if CJK_CHARACTER_PATTERN.search(query) else "la"
+
+
+def build_comparison_detail_rows(pair_number, source, query, language, status, matches):
+    """Build one or more diagnostic rows for one side of a comparison pair."""
+    input_columns = [query, ""] if language == "zh" else ["", query]
+    row_prefix = [str(pair_number), source, *input_columns, status]
+    if matches:
+        return [[*row_prefix, *match] for match in matches]
+    return [[*row_prefix, *([""] * len(HEADERS))]]
+
+
+def build_pair_comparison_rows(list_a_text, list_b_text):
+    """Compare two mixed-language lists and return full diagnostic records."""
+    list_a_queries = parse_batch_queries(list_a_text, deduplicate=False)
+    list_b_queries = parse_batch_queries(list_b_text, deduplicate=False)
+    pair_count = max(len(list_a_queries), len(list_b_queries))
+    result_rows = []
+    matched_pair_count = 0
+
+    for pair_index in range(pair_count):
+        list_a_query = (
+            list_a_queries[pair_index] if pair_index < len(list_a_queries) else ""
+        )
+        list_b_query = (
+            list_b_queries[pair_index] if pair_index < len(list_b_queries) else ""
+        )
+        list_a_matches = (
+            GENUS_EXACT_LOOKUP.get(list_a_query.casefold(), [])
+            if list_a_query
+            else []
+        )
+        list_b_matches = (
+            GENUS_EXACT_LOOKUP.get(list_b_query.casefold(), [])
+            if list_b_query
+            else []
+        )
+        list_a_language = classify_genus_query(list_a_query) if list_a_query else None
+        list_b_language = classify_genus_query(list_b_query) if list_b_query else None
+        common_matches = [row for row in list_a_matches if row in list_b_matches]
+
+        if common_matches:
+            matched_pair_count += 1
+            entries = [
+                (list_a_query, list_a_language),
+                (list_b_query, list_b_language),
+            ]
+            chinese_inputs = [
+                query for query, language in entries if language == "zh"
+            ]
+            latin_inputs = [query for query, language in entries if language == "la"]
+            for match in common_matches:
+                result_rows.append(
+                    [
+                        str(pair_index + 1),
+                        "A + B",
+                        " / ".join(chinese_inputs),
+                        " / ".join(latin_inputs),
+                        "Matched pair",
+                        *match,
+                    ]
+                )
+            continue
+
+        if not list_a_query:
+            result_rows.extend(
+                build_comparison_detail_rows(
+                    pair_index + 1,
+                    "B",
+                    list_b_query,
+                    list_b_language,
+                    "Missing list A",
+                    list_b_matches,
+                )
+            )
+            continue
+
+        if not list_b_query:
+            result_rows.extend(
+                build_comparison_detail_rows(
+                    pair_index + 1,
+                    "A",
+                    list_a_query,
+                    list_a_language,
+                    "Missing list B",
+                    list_a_matches,
+                )
+            )
+            continue
+
+        if list_a_matches and list_b_matches:
+            list_a_status = list_b_status = "Mismatch"
+        elif not list_a_matches and not list_b_matches:
+            list_a_status = (
+                "Chinese not found" if list_a_language == "zh" else "Latin not found"
+            )
+            list_b_status = (
+                "Chinese not found" if list_b_language == "zh" else "Latin not found"
+            )
+        elif not list_a_matches:
+            list_a_status = (
+                "Chinese not found" if list_a_language == "zh" else "Latin not found"
+            )
+            list_b_status = "Counterpart not found"
+        else:
+            list_a_status = "Counterpart not found"
+            list_b_status = (
+                "Chinese not found" if list_b_language == "zh" else "Latin not found"
+            )
+
+        result_rows.extend(
+            build_comparison_detail_rows(
+                pair_index + 1,
+                "A",
+                list_a_query,
+                list_a_language,
+                list_a_status,
+                list_a_matches,
+            )
+        )
+        result_rows.extend(
+            build_comparison_detail_rows(
+                pair_index + 1,
+                "B",
+                list_b_query,
+                list_b_language,
+                list_b_status,
+                list_b_matches,
+            )
+        )
+
+    return list_a_queries, list_b_queries, result_rows, matched_pair_count
+
 # ========== 录入数据内存存储 ==========
 samples_memory = {}  # {sample_name: total_abundance}
 abundances_memory = []  # [(sample_name, genus_la, abundance), ...]
 current_project = {"name": ""}
-ui_state = {"language": "en", "page_index": 0, "welcome_shown": False}
+
+
+def create_search_state(source=None):
+    """Return an isolated, validated snapshot of the Search page state."""
+    source = source or {}
+    selected_column = source.get("column", "Genus(zh)")
+    if selected_column not in SEARCH_COLUMNS:
+        selected_column = "Genus(zh)"
+
+    return {
+        "column": selected_column,
+        "keyword": source.get("keyword", ""),
+        "batch_list_a": source.get("batch_list_a", ""),
+        "batch_list_b": source.get("batch_list_b", ""),
+        "headers": list(source.get("headers") or HEADERS),
+        "rows": [list(row) for row in source.get("rows", [])],
+        "page": max(0, int(source.get("page", 0))),
+        "kind": source.get("kind", "search"),
+        "query_count": max(0, int(source.get("query_count", 0))),
+        "matched_query_count": max(
+            0, int(source.get("matched_query_count", 0))
+        ),
+        "has_run": bool(source.get("has_run", False)),
+    }
+
+
+ui_state = {
+    "language": "en",
+    "page_index": 0,
+    "welcome_shown": False,
+    "search_state": create_search_state(),
+}
 DRAFT_FORMAT_NAME = "NemaDB Input Draft"
 DRAFT_FORMAT_VERSION = 1
 DRAFT_FILE_EXTENSION = ".nemadb"
@@ -571,12 +813,14 @@ def main(page: ft.Page):
     database_export_picker = ft.FilePicker()
     page.services.append(database_export_picker)
     clipboard = ft.Clipboard()
+    saved_search_state = create_search_state(ui_state.get("search_state"))
 
     def show_localized_dialog(dialog):
         localize_control(dialog)
         page.show_dialog(dialog)
 
     def toggle_language(e):
+        capture_search_state()
         ui_state["language"] = "zh" if ui_state["language"] == "en" else "en"
         page.controls.clear()
         page.overlay.clear()
@@ -588,7 +832,7 @@ def main(page: ft.Page):
     col_dropdown = ft.Dropdown(
         label="Search by",
         options=[ft.DropdownOption(key=k, text=k) for k in SEARCH_COLUMNS],
-        value="Genus(zh)",
+        value=saved_search_state["column"],
         width=190,
         border=ft.OutlineInputBorder(border_radius=10),
         bgcolor=SURFACE,
@@ -596,6 +840,7 @@ def main(page: ft.Page):
     keyword_field = ft.TextField(
         label="Keyword",
         hint_text="Search a genus or family",
+        value=saved_search_state["keyword"],
         prefix_icon=ft.Icons.SEARCH,
         expand=True,
         border=ft.OutlineInputBorder(border_radius=10),
@@ -625,7 +870,15 @@ def main(page: ft.Page):
         bgcolor=SURFACE,
     )
     SEARCH_PAGE_SIZE = 50
-    search_results = {"rows": [], "page": 0, "kind": "search"}
+    search_results = {
+        "headers": saved_search_state["headers"],
+        "rows": saved_search_state["rows"],
+        "page": saved_search_state["page"],
+        "kind": saved_search_state["kind"],
+        "query_count": saved_search_state["query_count"],
+        "matched_query_count": saved_search_state["matched_query_count"],
+        "has_run": saved_search_state["has_run"],
+    }
     result_summary = ft.Text("No results yet.", color=TEXT_SECONDARY, size=13)
     prev_page_btn = ft.OutlinedButton("Previous", icon=ft.Icons.CHEVRON_LEFT, disabled=True)
     next_page_btn = ft.OutlinedButton("Next", icon=ft.Icons.CHEVRON_RIGHT, disabled=True)
@@ -659,6 +912,10 @@ def main(page: ft.Page):
     def render_search_page():
         matched = search_results["rows"]
         total = len(matched)
+        result_table.columns = [
+            ft.DataColumn(ft.Text(translate_text(header)))
+            for header in search_results["headers"]
+        ]
         if not total:
             result_table.rows = []
             result_summary.value = translate_text("No matching records.")
@@ -676,13 +933,57 @@ def main(page: ft.Page):
         end = min(start + SEARCH_PAGE_SIZE, total)
         visible_rows = matched[start:end]
 
-        result_table.rows = [
-            ft.DataRow(cells=[ft.DataCell(ft.Text(cell)) for cell in row])
-            for row in visible_rows
-        ]
-        result_summary.value = translate_text(
-            f"Showing {start + 1}-{end} of {total} result(s)."
-        )
+        rendered_rows = []
+        is_batch = search_results["kind"] == "batch"
+        is_comparison = search_results["kind"] == "comparison"
+        for row in visible_rows:
+            not_found = is_batch and row[1] == "Not found"
+            comparison_matched = is_comparison and row[4] == "Matched pair"
+            cells = []
+            for cell_index, cell in enumerate(row):
+                is_status_cell = (is_batch and cell_index == 1) or (
+                    is_comparison and cell_index == 4
+                )
+                display_value = translate_text(cell) if is_status_cell else cell
+                cell_color = None
+                cell_weight = None
+                if is_batch and cell_index in (0, 1):
+                    cell_color = DANGER if not_found else SUCCESS
+                    cell_weight = ft.FontWeight.W_600
+                elif is_comparison and cell_index in (2, 3, 4):
+                    cell_color = SUCCESS if comparison_matched else DANGER
+                    cell_weight = ft.FontWeight.W_600
+                cells.append(
+                    ft.DataCell(
+                        ft.Text(
+                            display_value,
+                            color=cell_color,
+                            weight=cell_weight,
+                        )
+                    )
+                )
+            rendered_rows.append(ft.DataRow(cells=cells))
+        result_table.rows = rendered_rows
+        if is_comparison:
+            pair_count = search_results["query_count"]
+            matched_pair_count = search_results["matched_query_count"]
+            issue_count = pair_count - matched_pair_count
+            result_summary.value = translate_text(
+                f"{matched_pair_count} of {pair_count} pairs matched · "
+                f"{issue_count} issue(s)."
+            )
+        elif is_batch:
+            query_count = search_results["query_count"]
+            matched_query_count = search_results["matched_query_count"]
+            not_found_count = query_count - matched_query_count
+            result_summary.value = translate_text(
+                f"{matched_query_count} of {query_count} queries matched · "
+                f"{not_found_count} not found · {total} result row(s)."
+            )
+        else:
+            result_summary.value = translate_text(
+                f"Showing {start + 1}-{end} of {total} result(s)."
+            )
         page_indicator.value = translate_text(f"Page {current_page + 1} / {max_page + 1}")
         prev_page_btn.disabled = current_page == 0
         next_page_btn.disabled = current_page >= max_page
@@ -690,7 +991,7 @@ def main(page: ft.Page):
         download_results_btn.disabled = False
 
     def on_keyword_change(text):
-        text = text.strip().lower()
+        text = text.strip().casefold()
         if not text:
             suggestion_container.height = 0
             suggestion_list.controls.clear()
@@ -701,7 +1002,7 @@ def main(page: ft.Page):
         matches = []
         for row in ALL_ROWS:
             val = row[col_idx]
-            if text in val.lower() and val not in seen:
+            if text in val.casefold() and val not in seen:
                 seen.add(val)
                 matches.append(val)
         if not matches:
@@ -709,7 +1010,7 @@ def main(page: ft.Page):
             suggestion_container.height = 0
             page.update()
             return
-        matches.sort(key=lambda x: (x.lower().find(text), x.lower()))
+        matches.sort(key=lambda x: (x.casefold().find(text), x.casefold()))
         suggestion_list.controls = [
             ft.ListTile(
                 title=ft.Text(m),
@@ -732,9 +1033,13 @@ def main(page: ft.Page):
         suggestion_container.height = 0
         suggestion_list.controls.clear()
         if not keyword:
+            search_results["headers"] = HEADERS
             search_results["rows"] = []
             search_results["page"] = 0
             search_results["kind"] = "search"
+            search_results["query_count"] = 0
+            search_results["matched_query_count"] = 0
+            search_results["has_run"] = False
             result_table.rows = []
             result_summary.value = translate_text("No results yet.")
             page_indicator.value = translate_text("Page 0 / 0")
@@ -745,10 +1050,18 @@ def main(page: ft.Page):
             page.update()
             return
         col_idx = SEARCH_COLUMNS[col_dropdown.value]
-        keyword_lower = keyword.lower()
-        search_results["rows"] = [row for row in ALL_ROWS if keyword_lower in row[col_idx].lower()]
+        keyword_normalized = keyword.casefold()
+        search_results["headers"] = HEADERS
+        search_results["rows"] = [
+            row
+            for row in ALL_ROWS
+            if keyword_normalized in row[col_idx].casefold()
+        ]
         search_results["page"] = 0
         search_results["kind"] = "search"
+        search_results["query_count"] = 0
+        search_results["matched_query_count"] = 0
+        search_results["has_run"] = True
         render_search_page()
         page.update()
 
@@ -759,8 +1072,145 @@ def main(page: ft.Page):
         icon=ft.Icons.FIND_IN_PAGE,
         on_click=do_search,
     )
+    batch_list_a_field = ft.TextField(
+        label="Genus list A",
+        hint_text="Smart split: spaces, tabs, line breaks, commas, semicolons, and more can be mixed.",
+        value=saved_search_state["batch_list_a"],
+        multiline=True,
+        min_lines=8,
+        max_lines=12,
+        autofocus=True,
+        expand=True,
+        border=ft.OutlineInputBorder(border_radius=10),
+        bgcolor=SURFACE,
+    )
+    batch_list_b_field = ft.TextField(
+        label="Genus list B",
+        hint_text="Smart split: spaces, tabs, line breaks, commas, semicolons, and more can be mixed.",
+        value=saved_search_state["batch_list_b"],
+        multiline=True,
+        min_lines=8,
+        max_lines=12,
+        expand=True,
+        border=ft.OutlineInputBorder(border_radius=10),
+        bgcolor=SURFACE,
+    )
+    batch_error_text = ft.Text(
+        "",
+        color=DANGER,
+        size=12,
+        visible=False,
+    )
+
+    def capture_search_state():
+        ui_state["search_state"] = create_search_state(
+            {
+                "column": col_dropdown.value,
+                "keyword": keyword_field.value or "",
+                "batch_list_a": batch_list_a_field.value or "",
+                "batch_list_b": batch_list_b_field.value or "",
+                "headers": search_results["headers"],
+                "rows": search_results["rows"],
+                "page": search_results["page"],
+                "kind": search_results["kind"],
+                "query_count": search_results["query_count"],
+                "matched_query_count": search_results["matched_query_count"],
+                "has_run": search_results["has_run"],
+            }
+        )
+
+    def run_batch_search(e):
+        list_a_queries = parse_batch_queries(
+            batch_list_a_field.value, deduplicate=False
+        )
+        list_b_queries = parse_batch_queries(
+            batch_list_b_field.value, deduplicate=False
+        )
+        if not list_a_queries and not list_b_queries:
+            batch_error_text.value = translate_text(
+                "Enter at least one Chinese or Latin genus name."
+            )
+            batch_error_text.visible = True
+            page.update()
+            return
+
+        batch_error_text.visible = False
+        suggestion_container.height = 0
+        suggestion_list.controls.clear()
+        if list_a_queries and list_b_queries:
+            (
+                list_a_queries,
+                list_b_queries,
+                rows,
+                matched_query_count,
+            ) = build_pair_comparison_rows(
+                batch_list_a_field.value,
+                batch_list_b_field.value,
+            )
+            search_results["headers"] = PAIR_COMPARISON_HEADERS
+            search_results["kind"] = "comparison"
+            query_count = max(len(list_a_queries), len(list_b_queries))
+        else:
+            active_text = (
+                batch_list_a_field.value
+                if list_a_queries
+                else batch_list_b_field.value
+            )
+            queries, rows, matched_query_count = build_batch_search_rows(active_text)
+            search_results["headers"] = BATCH_SEARCH_HEADERS
+            search_results["kind"] = "batch"
+            query_count = len(queries)
+
+        search_results["rows"] = rows
+        search_results["page"] = 0
+        search_results["query_count"] = query_count
+        search_results["matched_query_count"] = matched_query_count
+        search_results["has_run"] = True
+        page.pop_dialog()
+        render_search_page()
+        page.update()
+
+    batch_dialog = ft.AlertDialog(
+        modal=True,
+        title=ft.Text("Batch search and pair check"),
+        content=ft.Container(
+            width=760,
+            content=ft.Column(
+                [
+                    ft.Row(
+                        [batch_list_a_field, batch_list_b_field],
+                        spacing=16,
+                        vertical_alignment=ft.CrossAxisAlignment.START,
+                    ),
+                    batch_error_text,
+                ],
+                spacing=12,
+                tight=True,
+            ),
+        ),
+        actions=[
+            ft.TextButton("Cancel", on_click=lambda e: page.pop_dialog()),
+            ft.FilledButton(
+                "Search / compare",
+                icon=ft.Icons.SEARCH,
+                on_click=run_batch_search,
+            ),
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+        inset_padding=20,
+    )
+
+    def open_batch_search(e):
+        batch_error_text.visible = False
+        show_localized_dialog(batch_dialog)
+
+    batch_search_btn = ft.OutlinedButton(
+        "Batch search",
+        icon=ft.Icons.TABLE_ROWS_ROUNDED,
+        on_click=open_batch_search,
+    )
     search_input_row = ft.Row(
-        [keyword_field, search_btn],
+        [keyword_field, search_btn, batch_search_btn],
         spacing=10,
         expand=True,
         vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -781,7 +1231,9 @@ def main(page: ft.Page):
         if not rows:
             show_snackbar("No results to copy.")
             return
-        await clipboard.set(build_delimited_text(HEADERS, rows, delimiter="\t"))
+        await clipboard.set(
+            build_delimited_text(search_results["headers"], rows, delimiter="\t")
+        )
         show_snackbar(f"{len(rows):,} result(s) copied to clipboard.")
 
     async def download_search_results(e):
@@ -793,6 +1245,12 @@ def main(page: ft.Page):
         if search_results["kind"] == "all":
             file_name = "nemadb_all_records.csv"
             dialog_title = "Save all database records"
+        elif search_results["kind"] == "comparison":
+            file_name = "nemadb_genus_pair_comparison.csv"
+            dialog_title = "Save pair comparison results"
+        elif search_results["kind"] == "batch":
+            file_name = "nemadb_batch_search_results.csv"
+            dialog_title = "Save batch query results"
         else:
             search_label = col_dropdown.value or "search"
             keyword = keyword_field.value.strip() or "results"
@@ -802,7 +1260,7 @@ def main(page: ft.Page):
             file_name = f"{prefix}.csv"
             dialog_title = "Save query results"
 
-        payload = build_csv_bytes(HEADERS, rows)
+        payload = build_csv_bytes(search_results["headers"], rows)
         try:
             save_path = await database_export_picker.save_file(
                 dialog_title=translate_text(dialog_title),
@@ -832,9 +1290,13 @@ def main(page: ft.Page):
         keyword_field.value = ""
         suggestion_container.height = 0
         suggestion_list.controls.clear()
+        search_results["headers"] = HEADERS
         search_results["rows"] = ALL_ROWS
         search_results["page"] = 0
         search_results["kind"] = "all"
+        search_results["query_count"] = 0
+        search_results["matched_query_count"] = 0
+        search_results["has_run"] = True
         render_search_page()
         switch_page(0)
 
@@ -842,6 +1304,9 @@ def main(page: ft.Page):
     next_page_btn.on_click = go_to_next_page
     copy_results_btn.on_click = lambda e: page.run_task(copy_search_results, e)
     download_results_btn.on_click = lambda e: page.run_task(download_search_results, e)
+
+    if search_results["has_run"]:
+        render_search_page()
 
     search_panel = surface_panel(
         ft.Column(
@@ -2451,6 +2916,12 @@ def main(page: ft.Page):
                 "Choose a search column: Genus(zh), Genus(la), or Family.",
                 "Type a keyword to see fuzzy-match suggestions, then select a suggestion or keep your own keyword.",
                 "Click the search icon at the right side of the keyword field to display matching records.",
+                "Both boxes accept mixed Chinese and Latin genus names; results automatically separate them into Chinese and Latin columns.",
+                "Smart splitting accepts mixed whitespace, punctuation, and zero-width characters from copied text.",
+                "Fill both boxes to compare items positionally, or fill only one box for a regular batch search.",
+                "Matched pairs are shown once with the full standard database record.",
+                "Unmatched pairs are split into one row per input; extra items also include any database record found.",
+                "Batch search ignores letter case for Latin names, accepts Chinese names without the final 属, and keeps unmatched names as Not found rows.",
                 "Results are paginated at 50 rows per page for smoother browsing.",
                 "Select text directly in the table, or use Copy results to copy the complete matched dataset.",
                 "Use Download CSV to save all matched rows, not only the current page.",
