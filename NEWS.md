@@ -1,5 +1,25 @@
 # NemaDB News
 
+## Version 1.4.0 (2026-09-28)
+
+### New Features
+
+- **Copyable Search Results** – Select table text or copy all matching rows with headers for spreadsheet use
+- **Search CSV Export** – Download all matching rows as an Excel-compatible CSV file, including results beyond the current page
+- **Full Database View** – Click the record count to browse, copy, and download all reference records
+- **Search Layout** – Reduce the spacing between the search-field selector and keyword input
+- **Chinese Interface** – Add translations and Help instructions for the new search actions
+- **Release Link** – Open GitHub Releases from Help to download updates manually
+- **Startup Notice** – Show a bilingual initialization message and spinner in the packaged app's startup window, and print the same notice before source runs; explain that the first launch may take longer
+
+### Files
+
+- `main.py` – Added copy and download actions, the full database view, search layout refinements, and an early console startup notice
+- `i18n.py` – Added Chinese translations for the new actions and guidance
+- `pyproject.toml` – Updated project and Windows build versions to 1.4.0 and configured the bilingual boot screen
+- `README.md` – Corrected requirements and startup instructions
+- `NEWS.md` – Added release notes for version 1.4.0
+
 ## Version 1.3.0 (2026-09-28)
 
 ### New Features

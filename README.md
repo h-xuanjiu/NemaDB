@@ -11,13 +11,15 @@ A lightweight nematode data utility built with [Flet](https://flet.dev/).
 ## Features
 
 - **🔍 Search** – Search by Genus (Chinese/Latin) or Family with live suggestions
+- **📋 Copy & download** – Select table text, copy complete result sets, or export them as CSV
+- **🗃️ Full database view** – Open the record-count badge to browse and download all records
 - **📥 Input** – Create samples and record genus abundances with auto-complete
 - **💾 Export** – Export to `total_abundance.csv` and `genus_abundance.csv`
 
 ## Requirements
 
-- Python 3.8+
-- Flet
+- Python 3.10+
+- Flet 1.0.1 (installed with the project)
 
 
 
@@ -26,16 +28,24 @@ A lightweight nematode data utility built with [Flet](https://flet.dev/).
 ```
 .
 ├── main.py              # Main application
+├── i18n.py              # Interface translations
 ├── nematode.info.csv    # Reference nematode data
-└── pyproject.toml       # Version info
+├── assets/              # Application icon
+└── pyproject.toml       # Project configuration
 ```
 
 ## Usage
 
+Install the project dependencies, then start the app:
+
 ```bash
+python -m pip install -e .
 python main.py
 ```
-A pre-built Windows executable is available. Download and run directly without installing Python.
+
+The first source run may take longer while Flet prepares its desktop client.
+
+A pre-built Windows executable can be downloaded and run without installing Python.
 
 To build from source:
 

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import csv
+import io
 import json
 import math
 import urllib.parse
@@ -412,6 +413,20 @@ def sanitize_filename_prefix(name):
     return safe or "nemadb_project"
 
 
+def build_delimited_text(headers, rows, delimiter=","):
+    """Serialize tabular data consistently for downloads and the clipboard."""
+    buffer = io.StringIO(newline="")
+    writer = csv.writer(buffer, delimiter=delimiter, lineterminator="\r\n")
+    writer.writerow(headers)
+    writer.writerows(rows)
+    return buffer.getvalue()
+
+
+def build_csv_bytes(headers, rows):
+    """Return an Excel-friendly UTF-8 CSV payload, including a BOM."""
+    return build_delimited_text(headers, rows).encode("utf-8-sig")
+
+
 def genus_name_error(value):
     """Return a user-facing error when a genus name contains any digit."""
     text = (value or "").strip()
@@ -553,6 +568,10 @@ def main(page: ft.Page):
     page.window.min_width = 960
     page.window.min_height = 680
 
+    database_export_picker = ft.FilePicker()
+    page.services.append(database_export_picker)
+    clipboard = ft.Clipboard()
+
     def show_localized_dialog(dialog):
         localize_control(dialog)
         page.show_dialog(dialog)
@@ -606,10 +625,20 @@ def main(page: ft.Page):
         bgcolor=SURFACE,
     )
     SEARCH_PAGE_SIZE = 50
-    search_results = {"rows": [], "page": 0}
+    search_results = {"rows": [], "page": 0, "kind": "search"}
     result_summary = ft.Text("No results yet.", color=TEXT_SECONDARY, size=13)
     prev_page_btn = ft.OutlinedButton("Previous", icon=ft.Icons.CHEVRON_LEFT, disabled=True)
     next_page_btn = ft.OutlinedButton("Next", icon=ft.Icons.CHEVRON_RIGHT, disabled=True)
+    copy_results_btn = ft.OutlinedButton(
+        "Copy results",
+        icon=ft.Icons.CONTENT_COPY,
+        disabled=True,
+    )
+    download_results_btn = ft.FilledButton(
+        "Download CSV",
+        icon=ft.Icons.DOWNLOAD,
+        disabled=True,
+    )
     page_indicator = ft.Text("Page 0 / 0", color=TEXT_SECONDARY, size=12)
     pagination_row = ft.Row(
         [prev_page_btn, page_indicator, next_page_btn],
@@ -618,7 +647,11 @@ def main(page: ft.Page):
         wrap=True,
     )
     table_area = ft.Column(
-        [ft.Row([result_table], scroll="auto")],
+        [
+            ft.SelectionArea(
+                content=ft.Row([result_table], scroll=ft.ScrollMode.AUTO),
+            )
+        ],
         scroll=ft.ScrollMode.AUTO,
         expand=True,
     )
@@ -632,6 +665,8 @@ def main(page: ft.Page):
             page_indicator.value = translate_text("Page 0 / 0")
             prev_page_btn.disabled = True
             next_page_btn.disabled = True
+            copy_results_btn.disabled = True
+            download_results_btn.disabled = True
             return
 
         max_page = (total - 1) // SEARCH_PAGE_SIZE
@@ -651,6 +686,8 @@ def main(page: ft.Page):
         page_indicator.value = translate_text(f"Page {current_page + 1} / {max_page + 1}")
         prev_page_btn.disabled = current_page == 0
         next_page_btn.disabled = current_page >= max_page
+        copy_results_btn.disabled = False
+        download_results_btn.disabled = False
 
     def on_keyword_change(text):
         text = text.strip().lower()
@@ -697,17 +734,21 @@ def main(page: ft.Page):
         if not keyword:
             search_results["rows"] = []
             search_results["page"] = 0
+            search_results["kind"] = "search"
             result_table.rows = []
             result_summary.value = translate_text("No results yet.")
             page_indicator.value = translate_text("Page 0 / 0")
             prev_page_btn.disabled = True
             next_page_btn.disabled = True
+            copy_results_btn.disabled = True
+            download_results_btn.disabled = True
             page.update()
             return
         col_idx = SEARCH_COLUMNS[col_dropdown.value]
         keyword_lower = keyword.lower()
         search_results["rows"] = [row for row in ALL_ROWS if keyword_lower in row[col_idx].lower()]
         search_results["page"] = 0
+        search_results["kind"] = "search"
         render_search_page()
         page.update()
 
@@ -721,6 +762,7 @@ def main(page: ft.Page):
     search_input_row = ft.Row(
         [keyword_field, search_btn],
         spacing=10,
+        expand=True,
         vertical_alignment=ft.CrossAxisAlignment.CENTER,
     )
 
@@ -734,8 +776,72 @@ def main(page: ft.Page):
         render_search_page()
         page.update()
 
+    async def copy_search_results(e):
+        rows = search_results["rows"]
+        if not rows:
+            show_snackbar("No results to copy.")
+            return
+        await clipboard.set(build_delimited_text(HEADERS, rows, delimiter="\t"))
+        show_snackbar(f"{len(rows):,} result(s) copied to clipboard.")
+
+    async def download_search_results(e):
+        rows = search_results["rows"]
+        if not rows:
+            show_snackbar("No results to download.")
+            return
+
+        if search_results["kind"] == "all":
+            file_name = "nemadb_all_records.csv"
+            dialog_title = "Save all database records"
+        else:
+            search_label = col_dropdown.value or "search"
+            keyword = keyword_field.value.strip() or "results"
+            prefix = sanitize_filename_prefix(
+                f"nemadb_{search_label}_{keyword}_results"
+            )[:100]
+            file_name = f"{prefix}.csv"
+            dialog_title = "Save query results"
+
+        payload = build_csv_bytes(HEADERS, rows)
+        try:
+            save_path = await database_export_picker.save_file(
+                dialog_title=translate_text(dialog_title),
+                file_name=file_name,
+                initial_directory=str(Path.home()),
+                file_type=ft.FilePickerFileType.CUSTOM,
+                allowed_extensions=["csv"],
+                src_bytes=payload,
+            )
+            if page.web:
+                show_snackbar("CSV download started.")
+                return
+            if not save_path:
+                return
+
+            csv_path = Path(save_path)
+            if csv_path.suffix.lower() != ".csv":
+                csv_path = csv_path.with_suffix(".csv")
+            csv_path.write_bytes(payload)
+            show_snackbar(f"CSV saved to: {csv_path.resolve()}")
+        except (OSError, PermissionError, IOError) as ex:
+            show_dialog("Download Failed", f"Could not save the CSV file.\nError: {ex}")
+        except Exception as ex:
+            show_dialog("Download Failed", f"Could not open the save dialog.\nError: {ex}")
+
+    def show_all_database_records(e):
+        keyword_field.value = ""
+        suggestion_container.height = 0
+        suggestion_list.controls.clear()
+        search_results["rows"] = ALL_ROWS
+        search_results["page"] = 0
+        search_results["kind"] = "all"
+        render_search_page()
+        switch_page(0)
+
     prev_page_btn.on_click = go_to_previous_page
     next_page_btn.on_click = go_to_next_page
+    copy_results_btn.on_click = lambda e: page.run_task(copy_search_results, e)
+    download_results_btn.on_click = lambda e: page.run_task(download_search_results, e)
 
     search_panel = surface_panel(
         ft.Column(
@@ -746,13 +852,10 @@ def main(page: ft.Page):
                     ft.Icons.SEARCH_ROUNDED,
                 ),
                 ft.Container(height=4),
-                ft.ResponsiveRow(
-                    [
-                        ft.Column([col_dropdown], col={"xs": 12, "sm": 4, "md": 3}),
-                        ft.Column([search_input_row], col={"xs": 12, "sm": 8, "md": 9}),
-                    ],
+                ft.Row(
+                    [col_dropdown, search_input_row],
                     spacing=12,
-                    run_spacing=12,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
                 suggestion_container,
             ],
@@ -771,7 +874,16 @@ def main(page: ft.Page):
                             ft.Icons.TABLE_ROWS_ROUNDED,
                         ),
                         ft.Column(
-                            [result_summary, pagination_row],
+                            [
+                                ft.Row(
+                                    [result_summary, copy_results_btn, download_results_btn],
+                                    alignment=ft.MainAxisAlignment.END,
+                                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                                    wrap=True,
+                                    spacing=8,
+                                ),
+                                pagination_row,
+                            ],
                             spacing=8,
                             horizontal_alignment=ft.CrossAxisAlignment.END,
                         ),
@@ -1907,7 +2019,6 @@ def main(page: ft.Page):
     SUBMISSION_EMAIL = "heyuxuan0525@outlook.com"
     url_launcher = ft.UrlLauncher()
     page.services.append(url_launcher)
-    clipboard = ft.Clipboard()
 
     def show_snackbar(message):
         snackbar = ft.SnackBar(ft.Text(message), duration=3000)
@@ -2301,11 +2412,31 @@ def main(page: ft.Page):
                         spacing=3,
                         expand=True,
                     ),
-                    ft.Container(
-                        content=ft.Text(f"v{version}", size=11, color=PRIMARY, weight=ft.FontWeight.W_600),
-                        padding=ft.Padding.symmetric(horizontal=10, vertical=6),
-                        bgcolor=PRIMARY_SOFT,
-                        border_radius=20,
+                    ft.Row(
+                        [
+                            ft.Container(
+                                content=ft.Text(
+                                    f"v{version}",
+                                    size=11,
+                                    color=PRIMARY,
+                                    weight=ft.FontWeight.W_600,
+                                ),
+                                padding=ft.Padding.symmetric(horizontal=10, vertical=6),
+                                bgcolor=PRIMARY_SOFT,
+                                border_radius=20,
+                            ),
+                            ft.OutlinedButton(
+                                "GitHub Releases",
+                                icon=ft.Icons.OPEN_IN_NEW,
+                                tooltip="https://github.com/h-xuanjiu/NemaDB/releases",
+                                url=ft.Url(
+                                    url="https://github.com/h-xuanjiu/NemaDB/releases",
+                                    target=ft.UrlTarget.BLANK,
+                                ),
+                            ),
+                        ],
+                        spacing=8,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
                 ],
                 spacing=14,
@@ -2321,6 +2452,9 @@ def main(page: ft.Page):
                 "Type a keyword to see fuzzy-match suggestions, then select a suggestion or keep your own keyword.",
                 "Click the search icon at the right side of the keyword field to display matching records.",
                 "Results are paginated at 50 rows per page for smoother browsing.",
+                "Select text directly in the table, or use Copy results to copy the complete matched dataset.",
+                "Use Download CSV to save all matched rows, not only the current page.",
+                "Click the record count in the top bar to browse, copy, or download the full database.",
             ],
         ),
         help_section(
@@ -2532,6 +2666,7 @@ def main(page: ft.Page):
             [
                 ft.Icon(ft.Icons.STORAGE_ROUNDED, size=15, color=PRIMARY),
                 ft.Text(f"{len(ALL_ROWS):,} records", size=12, color=TEXT_SECONDARY),
+                ft.Icon(ft.Icons.CHEVRON_RIGHT, size=16, color=TEXT_MUTED),
             ],
             spacing=7,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -2540,6 +2675,9 @@ def main(page: ft.Page):
         bgcolor=SURFACE_SUBTLE,
         border=ft.Border.all(1, BORDER),
         border_radius=20,
+        tooltip="View all records and download",
+        ink=True,
+        on_click=show_all_database_records,
     )
 
     language_switch_copy = get_language_switch_copy(ui_state["language"])
@@ -2683,6 +2821,11 @@ def run_app():
     runtime_dir.mkdir(parents=True, exist_ok=True)
     try:
         os.chdir(runtime_dir)
+        print(
+            "NemaDB 正在启动，请稍候… / NemaDB is starting, please wait…\n"
+            "首次启动可能较慢 / First launch may take longer",
+            flush=True,
+        )
         ft.run(main)
     finally:
         os.chdir(original_cwd)
