@@ -1,5 +1,25 @@
 # NemaDB News
 
+## Version 1.6.0 (2026-09-30)
+
+### New Features
+
+- **Project Genus Annotations** – Save one deduplicated annotation per recorded Latin genus, including Chinese name, family, feeding type, CP value, genus average fresh weight, and family average fresh weight
+- **Stored Relative Abundance** – Calculate each genus abundance divided by its sample genus-abundance sum during data entry and save the result in `.nemadb` drafts
+- **Trophic-Group Proportions** – Calculate abundance-weighted Ba, Fu, Pp, Op, and Other proportions during data entry, store them in version 4 `.nemadb` drafts, and export them beside Abundance
+- **Single Excel Export** – Export one `.xlsx` workbook in the order Genus Annotations, Abundance, Genus Abundance, and Genus Relative Abundance
+- **Excel Numeric Display** – Keep integers unchanged while displaying non-integer values to two decimal places in the Abundance and Genus Relative Abundance sheets without reducing stored precision
+- **Draft Compatibility** – Continue loading version 1, 2, and 3 `.nemadb` drafts, enriching annotations and calculating missing relative or trophic-group proportions during loading
+
+### Files
+
+- `main.py` – Added project annotation snapshots, stored relative and trophic-group proportions, version 4 draft handling, legacy draft compatibility, and four-sheet Excel workbook export
+- `i18n.py` – Updated Chinese help and export messages
+- `pyproject.toml` – Added OpenPyXL 3.0.9+ for workbook generation and updated project and Windows build versions to 1.6.0
+- `README.md` – Documented project annotations and the new Excel export
+- `NEWS.md` – Added release notes for version 1.6.0
+- `tests/test_project_exports.py` – Added coverage for annotations, relative abundance, trophic groups, draft compatibility, workbook layout, and numeric display formats
+
 ## Version 1.5.0 (2026-09-29)
 
 ### New Features

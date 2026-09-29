@@ -1,10 +1,11 @@
 [project]
 name = "NemaDB"
-version = "1.5.0"
+version = "1.6.0"
 description = "NemaDB"
 requires-python = ">=3.10"
 dependencies = [
     "flet==1.0.1",
+    "openpyxl>=3.0.9,<4",
 ]
 
 [tool.flet.app]
@@ -40,6 +41,6 @@ fade_out_duration = 250
 # url = "./flet_build_template"
 
 [tool.flet.build]
-file_version = "1.5.0.0"
-product_version = "1.5.0.0"
+file_version = "1.6.0.0"
+product_version = "1.6.0.0"
 product_name = "NemaDB"

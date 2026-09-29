@@ -8,6 +8,8 @@ import re
 import urllib.parse
 from pathlib import Path
 import flet as ft
+from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
 import sys
 import os
 import tempfile
@@ -76,9 +78,14 @@ HEADERS, ALL_ROWS = load_data()
 # 构建属名双向映射
 ZH_TO_LA = {}
 LA_TO_ZH = {}
+REFERENCE_BY_LATIN = {}
 for row in ALL_ROWS:
     zh = row[0].strip()
     la = row[1].strip()
+    if la:
+        # Keep the last row, matching the existing LA_TO_ZH behavior when the
+        # reference CSV contains a duplicate Latin name.
+        REFERENCE_BY_LATIN[la.casefold()] = row
     if zh and la:
         ZH_TO_LA[zh] = la
         LA_TO_ZH[la] = zh
@@ -299,6 +306,9 @@ def build_pair_comparison_rows(list_a_text, list_b_text):
 # ========== 录入数据内存存储 ==========
 samples_memory = {}  # {sample_name: total_abundance}
 abundances_memory = []  # [(sample_name, genus_la, abundance), ...]
+relative_abundances_memory = []  # [(sample_name, genus_la, relative_abundance), ...]
+trophic_group_proportions_memory = {}  # {sample_name: {Ba/Fu/Pp/Op/Other: proportion}}
+genus_annotations_memory = {}  # {latin_name.casefold(): annotation}
 current_project = {"name": ""}
 
 
@@ -333,7 +343,8 @@ ui_state = {
     "search_state": create_search_state(),
 }
 DRAFT_FORMAT_NAME = "NemaDB Input Draft"
-DRAFT_FORMAT_VERSION = 1
+DRAFT_FORMAT_VERSION = 4
+DRAFT_SUPPORTED_VERSIONS = {1, 2, 3, DRAFT_FORMAT_VERSION}
 DRAFT_FILE_EXTENSION = ".nemadb"
 
 # ========== Visual system ==========
@@ -693,7 +704,362 @@ def nonnegative_number_error(value):
     return None
 
 
-def build_draft_payload(project_name, samples, abundances):
+GENUS_ANNOTATION_FIELDS = (
+    "latin_name",
+    "chinese_name",
+    "family",
+    "feeding_type",
+    "cp_value",
+    "genus_average_fresh_weight",
+    "family_average_fresh_weight",
+)
+
+
+def normalize_annotation_number(value, field_name, integer=False):
+    """Return a validated JSON number or None for a genus annotation field."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        raise ValueError(f"{field_name} must be a number or null.")
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{field_name} must be a number or null.")
+    if not math.isfinite(number) or number < 0:
+        raise ValueError(f"{field_name} must be a non-negative finite number or null.")
+    if integer:
+        if not number.is_integer():
+            raise ValueError(f"{field_name} must be an integer or null.")
+        return int(number)
+    return number
+
+
+def normalize_genus_annotation(annotation):
+    """Validate and order one project-level genus annotation."""
+    if not isinstance(annotation, dict):
+        raise ValueError("Each genus annotation must be an object.")
+
+    latin_name = annotation.get("latin_name")
+    if not isinstance(latin_name, str) or not latin_name.strip():
+        raise ValueError("Each genus annotation must include latin_name.")
+
+    text_values = {}
+    for field_name in ("chinese_name", "family", "feeding_type"):
+        value = annotation.get(field_name, "")
+        if value is None:
+            value = ""
+        if not isinstance(value, str):
+            raise ValueError(f"{field_name} must be text.")
+        text_values[field_name] = value.strip()
+
+    return {
+        "latin_name": latin_name.strip(),
+        "chinese_name": text_values["chinese_name"],
+        "family": text_values["family"],
+        "feeding_type": text_values["feeding_type"],
+        "cp_value": normalize_annotation_number(
+            annotation.get("cp_value"), "cp_value", integer=True
+        ),
+        "genus_average_fresh_weight": normalize_annotation_number(
+            annotation.get("genus_average_fresh_weight"),
+            "genus_average_fresh_weight",
+        ),
+        "family_average_fresh_weight": normalize_annotation_number(
+            annotation.get("family_average_fresh_weight"),
+            "family_average_fresh_weight",
+        ),
+    }
+
+
+def build_reference_genus_annotation(latin_name):
+    """Build one annotation from the final matching Latin-name reference row."""
+    requested_name = (latin_name or "").strip()
+    row = REFERENCE_BY_LATIN.get(requested_name.casefold())
+    if row is None:
+        return normalize_genus_annotation(
+            {
+                "latin_name": requested_name,
+                "chinese_name": "",
+                "family": "",
+                "feeding_type": "",
+                "cp_value": None,
+                "genus_average_fresh_weight": None,
+                "family_average_fresh_weight": None,
+            }
+        )
+
+    return normalize_genus_annotation(
+        {
+            "latin_name": row[1].strip(),
+            "chinese_name": row[0].strip(),
+            "family": row[2].strip(),
+            "feeding_type": row[3].strip(),
+            "cp_value": row[4].strip(),
+            "genus_average_fresh_weight": row[5].strip(),
+            "family_average_fresh_weight": row[6].strip(),
+        }
+    )
+
+
+def build_project_genus_annotations(abundances, existing_annotations=None):
+    """Return one ordered annotation per Latin genus used by the project."""
+    existing_by_latin = {}
+    if existing_annotations:
+        values = (
+            existing_annotations.values()
+            if isinstance(existing_annotations, dict)
+            else existing_annotations
+        )
+        for annotation in values:
+            normalized = normalize_genus_annotation(annotation)
+            existing_by_latin[normalized["latin_name"].casefold()] = normalized
+
+    used_genera = {}
+    for _, latin_name, _ in abundances:
+        cleaned_name = (latin_name or "").strip()
+        if cleaned_name:
+            used_genera.setdefault(cleaned_name.casefold(), cleaned_name)
+
+    annotations = []
+    for latin_key in sorted(used_genera, key=lambda key: used_genera[key].casefold()):
+        annotation = existing_by_latin.get(latin_key)
+        if annotation is None:
+            annotation = build_reference_genus_annotation(used_genera[latin_key])
+        annotations.append(annotation)
+    return annotations
+
+
+TROPHIC_GROUP_CODES = ("Ba", "Fu", "Pp", "Op", "Other")
+FEEDING_TYPE_TO_TROPHIC_GROUP = {
+    "bacterial feeders": "Ba",
+    "fungus feeders": "Fu",
+    "plant feeders": "Pp",
+    "predators": "Op",
+    "omnivores": "Op",
+}
+
+
+def feeding_type_to_trophic_group(feeding_type):
+    """Map one stored feeding type to the five exported trophic groups."""
+    normalized = (feeding_type or "").strip().casefold()
+    return FEEDING_TYPE_TO_TROPHIC_GROUP.get(normalized, "Other")
+
+
+def calculate_trophic_group_proportions(
+    abundances,
+    annotations=None,
+    sample_names=None,
+):
+    """Calculate abundance-weighted trophic-group proportions per sample."""
+    project_annotations = build_project_genus_annotations(abundances, annotations)
+    annotation_by_latin = {
+        annotation["latin_name"].casefold(): annotation
+        for annotation in project_annotations
+    }
+    ordered_sample_names = list(sample_names or [])
+    seen_sample_names = set(ordered_sample_names)
+    for sample_name, _, _ in abundances:
+        if sample_name not in seen_sample_names:
+            ordered_sample_names.append(sample_name)
+            seen_sample_names.add(sample_name)
+
+    totals = {sample_name: 0.0 for sample_name in ordered_sample_names}
+    grouped_abundances = {
+        sample_name: {group: 0.0 for group in TROPHIC_GROUP_CODES}
+        for sample_name in ordered_sample_names
+    }
+    for sample_name, latin_name, abundance in abundances:
+        annotation = annotation_by_latin.get(latin_name.strip().casefold())
+        feeding_type = annotation["feeding_type"] if annotation else ""
+        trophic_group = feeding_type_to_trophic_group(feeding_type)
+        grouped_abundances[sample_name][trophic_group] += abundance
+        totals[sample_name] += abundance
+
+    proportions = {}
+    for sample_name in ordered_sample_names:
+        total = totals[sample_name]
+        if total > 0:
+            proportions[sample_name] = {
+                group: grouped_abundances[sample_name][group] / total
+                for group in TROPHIC_GROUP_CODES
+            }
+        else:
+            proportions[sample_name] = {
+                group: 0.0 for group in TROPHIC_GROUP_CODES
+            }
+    return proportions
+
+
+def normalize_trophic_group_proportions(samples, abundances, proportions):
+    """Validate stored sample trophic-group proportions in project order."""
+    if not isinstance(proportions, dict):
+        raise ValueError("Project trophic-group proportions are missing.")
+
+    expected_sample_names = set(samples)
+    provided_sample_names = set(proportions)
+    if expected_sample_names != provided_sample_names:
+        missing_count = len(expected_sample_names - provided_sample_names)
+        extra_count = len(provided_sample_names - expected_sample_names)
+        raise ValueError(
+            "Stored trophic-group proportions do not match the project samples "
+            f"({missing_count} missing, {extra_count} extra)."
+        )
+
+    samples_with_abundance = {sample_name for sample_name, _, _ in abundances}
+    normalized = {}
+    for sample_name in samples:
+        sample_values = proportions[sample_name]
+        if not isinstance(sample_values, dict):
+            raise ValueError(
+                f"Trophic-group proportions for sample '{sample_name}' must be an object."
+            )
+        if set(sample_values) != set(TROPHIC_GROUP_CODES):
+            raise ValueError(
+                f"Trophic-group proportions for sample '{sample_name}' must contain "
+                f"{', '.join(TROPHIC_GROUP_CODES)}."
+            )
+
+        normalized_values = {}
+        for group in TROPHIC_GROUP_CODES:
+            value = sample_values[group]
+            if isinstance(value, bool):
+                raise ValueError(
+                    f"Trophic-group proportion {group} for sample '{sample_name}' is invalid."
+                )
+            try:
+                numeric_value = float(value)
+            except (TypeError, ValueError):
+                raise ValueError(
+                    f"Trophic-group proportion {group} for sample '{sample_name}' is invalid."
+                )
+            if not math.isfinite(numeric_value) or not 0 <= numeric_value <= 1:
+                raise ValueError(
+                    f"Trophic-group proportion {group} for sample '{sample_name}' must be between 0 and 1."
+                )
+            normalized_values[group] = numeric_value
+
+        expected_sum = 1.0 if sample_name in samples_with_abundance else 0.0
+        if not math.isclose(
+            sum(normalized_values.values()),
+            expected_sum,
+            rel_tol=1e-9,
+            abs_tol=1e-9,
+        ):
+            raise ValueError(
+                f"Trophic-group proportions for sample '{sample_name}' must sum to {expected_sum:g}."
+            )
+        normalized[sample_name] = normalized_values
+    return normalized
+
+
+def calculate_relative_abundances(abundances):
+    """Calculate each genus abundance as a fraction of its sample total."""
+    sample_totals = {}
+    for sample_name, _, abundance in abundances:
+        sample_totals[sample_name] = sample_totals.get(sample_name, 0.0) + abundance
+
+    relative_abundances = []
+    for sample_name, latin_name, abundance in abundances:
+        sample_total = sample_totals.get(sample_name, 0.0)
+        if sample_total > 0:
+            relative_abundances.append(
+                (sample_name, latin_name, abundance / sample_total)
+            )
+    return relative_abundances
+
+
+def normalize_relative_abundances(abundances, relative_abundances):
+    """Validate stored relative abundances and return them in abundance order."""
+    if relative_abundances is None:
+        raise ValueError("Project relative abundances are missing.")
+
+    expected_keys = []
+    for sample_name, latin_name, _ in abundances:
+        expected_keys.append((sample_name, latin_name.strip().casefold()))
+    if len(expected_keys) != len(set(expected_keys)):
+        raise ValueError("Project genus abundances contain duplicate sample/genus rows.")
+
+    relative_by_key = {}
+    for entry_index, entry in enumerate(relative_abundances, start=1):
+        if not isinstance(entry, (list, tuple)) or len(entry) != 3:
+            raise ValueError(
+                f"Relative abundance entry #{entry_index} must contain sample, genus, and value."
+            )
+        sample_name, latin_name, value = entry
+        if not isinstance(sample_name, str) or not sample_name.strip():
+            raise ValueError(
+                f"Relative abundance entry #{entry_index} has an invalid sample name."
+            )
+        if not isinstance(latin_name, str) or not latin_name.strip():
+            raise ValueError(
+                f"Relative abundance entry #{entry_index} has an invalid genus name."
+            )
+        if isinstance(value, bool):
+            raise ValueError(
+                f"Relative abundance entry #{entry_index} has an invalid value."
+            )
+        try:
+            numeric_value = float(value)
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"Relative abundance entry #{entry_index} has an invalid value."
+            )
+        if not math.isfinite(numeric_value) or not 0 <= numeric_value <= 1:
+            raise ValueError(
+                f"Relative abundance entry #{entry_index} must be between 0 and 1."
+            )
+
+        key = (sample_name.strip(), latin_name.strip().casefold())
+        if key in relative_by_key:
+            raise ValueError(
+                f"Duplicate relative abundance for sample '{sample_name}' and genus '{latin_name}'."
+            )
+        relative_by_key[key] = numeric_value
+
+    expected_key_set = set(expected_keys)
+    provided_key_set = set(relative_by_key)
+    if expected_key_set != provided_key_set:
+        missing_count = len(expected_key_set - provided_key_set)
+        extra_count = len(provided_key_set - expected_key_set)
+        raise ValueError(
+            "Stored relative abundances do not match the genus abundance rows "
+            f"({missing_count} missing, {extra_count} extra)."
+        )
+
+    sample_sums = {}
+    normalized = []
+    for sample_name, latin_name, _ in abundances:
+        key = (sample_name, latin_name.strip().casefold())
+        value = relative_by_key[key]
+        normalized.append((sample_name, latin_name, value))
+        sample_sums[sample_name] = sample_sums.get(sample_name, 0.0) + value
+
+    for sample_name, value_sum in sample_sums.items():
+        if not math.isclose(value_sum, 1.0, rel_tol=1e-9, abs_tol=1e-9):
+            raise ValueError(
+                f"Relative abundances for sample '{sample_name}' must sum to 1."
+            )
+    return normalized
+
+
+def build_draft_payload(
+    project_name,
+    samples,
+    abundances,
+    annotations=None,
+    relative_abundances=None,
+    trophic_group_proportions=None,
+):
+    normalized_relative_abundances = normalize_relative_abundances(
+        abundances, relative_abundances
+    )
+    normalized_trophic_group_proportions = normalize_trophic_group_proportions(
+        samples, abundances, trophic_group_proportions
+    )
+    relative_by_key = {
+        (sample_name, latin_name.casefold()): value
+        for sample_name, latin_name, value in normalized_relative_abundances
+    }
     sample_records = []
     for name, total_abundance in samples.items():
         genera = [
@@ -701,6 +1067,9 @@ def build_draft_payload(project_name, samples, abundances):
                 "genus_la": genus_la,
                 "genus_zh": LA_TO_ZH.get(genus_la, ""),
                 "abundance": abundance,
+                "relative_abundance": relative_by_key[
+                    (sample_name, genus_la.casefold())
+                ],
             }
             for sample_name, genus_la, abundance in abundances
             if sample_name == name
@@ -709,6 +1078,9 @@ def build_draft_payload(project_name, samples, abundances):
             {
                 "name": name,
                 "total_abundance": total_abundance,
+                "trophic_group_proportions": normalized_trophic_group_proportions[
+                    name
+                ],
                 "genera": genera,
             }
         )
@@ -718,6 +1090,9 @@ def build_draft_payload(project_name, samples, abundances):
         "version": DRAFT_FORMAT_VERSION,
         "app_version": version,
         "project_name": project_name,
+        "genus_annotations": build_project_genus_annotations(
+            abundances, annotations
+        ),
         "samples": sample_records,
     }
 
@@ -727,10 +1102,11 @@ def parse_draft_payload(payload):
         raise ValueError("Draft file must contain a JSON object.")
     if payload.get("format") != DRAFT_FORMAT_NAME:
         raise ValueError("This is not a NemaDB input draft file.")
-    if payload.get("version") != DRAFT_FORMAT_VERSION:
+    draft_version = payload.get("version")
+    if draft_version not in DRAFT_SUPPORTED_VERSIONS:
         raise ValueError(
-            f"Unsupported draft version: {payload.get('version')}. "
-            f"Expected version {DRAFT_FORMAT_VERSION}."
+            f"Unsupported draft version: {draft_version}. "
+            f"Supported versions: {sorted(DRAFT_SUPPORTED_VERSIONS)}."
         )
 
     sample_entries = payload.get("samples")
@@ -739,6 +1115,8 @@ def parse_draft_payload(payload):
 
     loaded_samples = {}
     loaded_abundances = []
+    loaded_relative_abundances = []
+    loaded_trophic_group_proportions = {}
     project_name = payload.get("project_name", "")
     if project_name is None:
         project_name = ""
@@ -761,7 +1139,7 @@ def parse_draft_payload(payload):
             total_abundance = float(sample.get("total_abundance"))
         except (TypeError, ValueError):
             raise ValueError(f"Sample '{sample_name}' has an invalid total abundance.")
-        if total_abundance < 0:
+        if not math.isfinite(total_abundance) or total_abundance < 0:
             raise ValueError(f"Sample '{sample_name}' has a negative total abundance.")
 
         genera = sample.get("genera", [])
@@ -769,6 +1147,10 @@ def parse_draft_payload(payload):
             raise ValueError(f"Sample '{sample_name}' has an invalid genera list.")
 
         loaded_samples[sample_name] = total_abundance
+        if draft_version >= 4:
+            loaded_trophic_group_proportions[sample_name] = sample.get(
+                "trophic_group_proportions"
+            )
 
         for genus_index, genus in enumerate(genera, start=1):
             if not isinstance(genus, dict):
@@ -786,14 +1168,244 @@ def parse_draft_payload(payload):
                 raise ValueError(
                     f"Genus '{genus_la}' in sample '{sample_name}' has invalid abundance."
                 )
-            if abundance < 0:
+            if not math.isfinite(abundance) or abundance < 0:
                 raise ValueError(
                     f"Genus '{genus_la}' in sample '{sample_name}' has negative abundance."
                 )
             if abundance > 0:
-                loaded_abundances.append((sample_name, genus_la.strip(), abundance))
+                cleaned_genus_name = genus_la.strip()
+                loaded_abundances.append(
+                    (sample_name, cleaned_genus_name, abundance)
+                )
+                if draft_version >= 3:
+                    relative_abundance = genus.get("relative_abundance")
+                    if isinstance(relative_abundance, bool):
+                        raise ValueError(
+                            f"Genus '{genus_la}' in sample '{sample_name}' has invalid relative abundance."
+                        )
+                    try:
+                        relative_abundance = float(relative_abundance)
+                    except (TypeError, ValueError):
+                        raise ValueError(
+                            f"Genus '{genus_la}' in sample '{sample_name}' has invalid relative abundance."
+                        )
+                    if (
+                        not math.isfinite(relative_abundance)
+                        or not 0 <= relative_abundance <= 1
+                    ):
+                        raise ValueError(
+                            f"Genus '{genus_la}' in sample '{sample_name}' has relative abundance outside 0 to 1."
+                        )
+                    loaded_relative_abundances.append(
+                        (sample_name, cleaned_genus_name, relative_abundance)
+                    )
 
-    return project_name, loaded_samples, loaded_abundances
+    loaded_annotations = []
+    if draft_version >= 2:
+        annotation_entries = payload.get("genus_annotations")
+        if not isinstance(annotation_entries, list):
+            raise ValueError("Draft file is missing the genus_annotations list.")
+
+        seen_annotation_names = set()
+        for annotation_index, annotation in enumerate(annotation_entries, start=1):
+            try:
+                normalized = normalize_genus_annotation(annotation)
+            except ValueError as ex:
+                raise ValueError(f"Genus annotation #{annotation_index}: {ex}")
+            latin_key = normalized["latin_name"].casefold()
+            if latin_key in seen_annotation_names:
+                raise ValueError(
+                    f"Duplicate genus annotation: {normalized['latin_name']}."
+                )
+            seen_annotation_names.add(latin_key)
+            loaded_annotations.append(normalized)
+
+    loaded_annotations = build_project_genus_annotations(
+        loaded_abundances, loaded_annotations
+    )
+    if draft_version >= 3:
+        loaded_relative_abundances = normalize_relative_abundances(
+            loaded_abundances, loaded_relative_abundances
+        )
+    else:
+        loaded_relative_abundances = calculate_relative_abundances(
+            loaded_abundances
+        )
+    if draft_version >= 4:
+        loaded_trophic_group_proportions = normalize_trophic_group_proportions(
+            loaded_samples,
+            loaded_abundances,
+            loaded_trophic_group_proportions,
+        )
+    else:
+        loaded_trophic_group_proportions = calculate_trophic_group_proportions(
+            loaded_abundances,
+            loaded_annotations,
+            sample_names=loaded_samples,
+        )
+    return (
+        project_name,
+        loaded_samples,
+        loaded_abundances,
+        loaded_relative_abundances,
+        loaded_trophic_group_proportions,
+        loaded_annotations,
+    )
+
+
+def style_export_worksheet(
+    worksheet,
+    numeric_columns=(),
+    display_two_decimals=False,
+):
+    """Keep Excel's default appearance while preserving useful data behavior."""
+    worksheet.sheet_view.showGridLines = True
+    worksheet.freeze_panes = "A2"
+    worksheet.auto_filter.ref = worksheet.dimensions
+
+    for column_index in numeric_columns:
+        for cell in worksheet.iter_cols(
+            min_col=column_index,
+            max_col=column_index,
+            min_row=2,
+        ):
+            for numeric_cell in cell:
+                value = numeric_cell.value
+                if (
+                    display_two_decimals
+                    and isinstance(value, (int, float))
+                    and not isinstance(value, bool)
+                ):
+                    numeric_cell.number_format = (
+                        "0" if float(value).is_integer() else "0.00"
+                    )
+                else:
+                    numeric_cell.number_format = "General"
+
+    for column_index, cells in enumerate(worksheet.iter_cols(), start=1):
+        max_length = max(
+            (len(str(cell.value)) for cell in cells if cell.value is not None),
+            default=0,
+        )
+        worksheet.column_dimensions[get_column_letter(column_index)].width = min(
+            max(max_length + 2, 12), 34
+        )
+
+
+def build_project_workbook_bytes(
+    project_name,
+    samples,
+    abundances,
+    annotations=None,
+    relative_abundances=None,
+    trophic_group_proportions=None,
+):
+    """Create the four-sheet project workbook from stored project data."""
+    project_annotations = build_project_genus_annotations(abundances, annotations)
+    normalized_relative_abundances = normalize_relative_abundances(
+        abundances, relative_abundances
+    )
+    normalized_trophic_group_proportions = normalize_trophic_group_proportions(
+        samples, abundances, trophic_group_proportions
+    )
+    genus_names = [annotation["latin_name"] for annotation in project_annotations]
+    genus_key_to_name = {
+        annotation["latin_name"].casefold(): annotation["latin_name"]
+        for annotation in project_annotations
+    }
+
+    sample_genus_values = {}
+    for sample_name, latin_name, abundance in abundances:
+        canonical_name = genus_key_to_name.get(
+            latin_name.casefold(), latin_name.strip()
+        )
+        sample_genus_values.setdefault(sample_name, {})[canonical_name] = abundance
+
+    sample_relative_values = {}
+    for sample_name, latin_name, relative_abundance in normalized_relative_abundances:
+        canonical_name = genus_key_to_name.get(
+            latin_name.casefold(), latin_name.strip()
+        )
+        sample_relative_values.setdefault(sample_name, {})[
+            canonical_name
+        ] = relative_abundance
+
+    workbook = Workbook()
+    workbook.properties.title = f"{project_name} - NemaDB abundance data"
+    workbook.properties.subject = (
+        "Nematode annotations, abundance, and relative abundance"
+    )
+    workbook.properties.creator = "NemaDB"
+
+    annotation_sheet = workbook.active
+    annotation_sheet.title = "Genus Annotations"
+    annotation_sheet.append(
+        [
+            "Latin Genus",
+            "Chinese Genus",
+            "Family",
+            "Feeding",
+            "CP",
+            "Genus Average Fresh Weight",
+            "Family Average Fresh Weight",
+        ]
+    )
+    for annotation in project_annotations:
+        annotation_sheet.append(
+            [annotation[field_name] for field_name in GENUS_ANNOTATION_FIELDS]
+        )
+    style_export_worksheet(annotation_sheet, numeric_columns=(5, 6, 7))
+
+    abundance_summary_sheet = workbook.create_sheet("Abundance")
+    abundance_summary_sheet.append(
+        ["SampleID", "Abundance", *TROPHIC_GROUP_CODES]
+    )
+    for sample_name, total_abundance in samples.items():
+        sample_proportions = normalized_trophic_group_proportions[sample_name]
+        abundance_summary_sheet.append(
+            [
+                sample_name,
+                total_abundance,
+                *[
+                    sample_proportions[group]
+                    for group in TROPHIC_GROUP_CODES
+                ],
+            ]
+        )
+    style_export_worksheet(
+        abundance_summary_sheet,
+        numeric_columns=tuple(range(2, len(TROPHIC_GROUP_CODES) + 3)),
+        display_two_decimals=True,
+    )
+
+    abundance_sheet = workbook.create_sheet("Genus Abundance")
+    abundance_sheet.append(["SampleID", *genus_names])
+    for sample_name in samples:
+        values = sample_genus_values.get(sample_name, {})
+        abundance_sheet.append(
+            [sample_name, *[values.get(genus_name, "") for genus_name in genus_names]]
+        )
+    style_export_worksheet(
+        abundance_sheet,
+        numeric_columns=tuple(range(2, len(genus_names) + 2)),
+    )
+
+    relative_sheet = workbook.create_sheet("Genus Relative Abundance")
+    relative_sheet.append(["SampleID", *genus_names])
+    for sample_name in samples:
+        values = sample_relative_values.get(sample_name, {})
+        relative_sheet.append(
+            [sample_name, *[values.get(genus_name, "") for genus_name in genus_names]]
+        )
+    style_export_worksheet(
+        relative_sheet,
+        numeric_columns=tuple(range(2, len(genus_names) + 2)),
+        display_two_decimals=True,
+    )
+
+    output = io.BytesIO()
+    workbook.save(output)
+    return output.getvalue()
 
 
 # ========== 主函数 ==========
@@ -1444,6 +2056,34 @@ def main(page: ft.Page):
     draft_file_picker = ft.FilePicker()
     page.services.append(draft_file_picker)
 
+    def replace_project_annotations(annotations):
+        genus_annotations_memory.clear()
+        for annotation in annotations:
+            normalized = normalize_genus_annotation(annotation)
+            genus_annotations_memory[normalized["latin_name"].casefold()] = normalized
+
+    def sync_project_annotations():
+        annotations = build_project_genus_annotations(
+            abundances_memory, genus_annotations_memory
+        )
+        replace_project_annotations(annotations)
+
+    def sync_relative_abundances():
+        relative_abundances_memory.clear()
+        relative_abundances_memory.extend(
+            calculate_relative_abundances(abundances_memory)
+        )
+
+    def sync_trophic_group_proportions():
+        trophic_group_proportions_memory.clear()
+        trophic_group_proportions_memory.update(
+            calculate_trophic_group_proportions(
+                abundances_memory,
+                genus_annotations_memory,
+                sample_names=samples_memory,
+            )
+        )
+
     def update_project_label():
         if current_project["name"]:
             project_name_text.value = current_project["name"]
@@ -1461,6 +2101,9 @@ def main(page: ft.Page):
         new_abund = [(sn, la, a) for sn, la, a in abundances_memory if sn != name]
         abundances_memory.clear()
         abundances_memory.extend(new_abund)
+        sync_relative_abundances()
+        sync_project_annotations()
+        sync_trophic_group_proportions()
         refresh_sample_list()
         snackbar = ft.SnackBar(ft.Text(f"Sample '{name}' has been deleted."), duration=3000)
         localize_control(snackbar)
@@ -1846,6 +2489,9 @@ def main(page: ft.Page):
         current_project["name"] = project_name
         samples_memory.clear()
         abundances_memory.clear()
+        relative_abundances_memory.clear()
+        trophic_group_proportions_memory.clear()
+        genus_annotations_memory.clear()
         new_sample_btn.disabled = False
         export_btn.disabled = False
         save_draft_btn.disabled = False
@@ -2077,6 +2723,9 @@ def main(page: ft.Page):
             abundances_memory.extend(new_list)
             for la, abund in genus_dict.items():
                 abundances_memory.append((sample_name, la, abund))
+            sync_relative_abundances()
+            sync_project_annotations()
+            sync_trophic_group_proportions()
 
             snackbar = ft.SnackBar(ft.Text(f"Sample '{sample_name}' added!"), duration=3000)
             localize_control(snackbar)
@@ -2253,6 +2902,9 @@ def main(page: ft.Page):
             abundances_memory.extend(new_list)
             for la, abund in genus_dict.items():
                 abundances_memory.append((sample_name, la, abund))
+            sync_relative_abundances()
+            sync_project_annotations()
+            sync_trophic_group_proportions()
 
             snackbar = ft.SnackBar(ft.Text(f"Sample '{sample_name}' updated!"), duration=3000)
             localize_control(snackbar)
@@ -2292,12 +2944,26 @@ def main(page: ft.Page):
         page.update()
 
     # ---- 草稿保存 / 读取 ----
-    def apply_loaded_draft(loaded_project_name, loaded_samples, loaded_abundances):
+    def apply_loaded_draft(
+        loaded_project_name,
+        loaded_samples,
+        loaded_abundances,
+        loaded_relative_abundances,
+        loaded_trophic_group_proportions,
+        loaded_annotations,
+    ):
         current_project["name"] = loaded_project_name or "Imported draft"
         samples_memory.clear()
         samples_memory.update(loaded_samples)
         abundances_memory.clear()
         abundances_memory.extend(loaded_abundances)
+        relative_abundances_memory.clear()
+        relative_abundances_memory.extend(loaded_relative_abundances)
+        trophic_group_proportions_memory.clear()
+        trophic_group_proportions_memory.update(
+            loaded_trophic_group_proportions
+        )
+        replace_project_annotations(loaded_annotations)
         sample_form.controls.clear()
         sample_form_panel.visible = False
         new_sample_btn.disabled = False
@@ -2323,7 +2989,14 @@ def main(page: ft.Page):
             return
 
         project_prefix = sanitize_filename_prefix(current_project["name"])
-        payload = build_draft_payload(current_project["name"], samples_memory, abundances_memory)
+        payload = build_draft_payload(
+            current_project["name"],
+            samples_memory,
+            abundances_memory,
+            annotations=genus_annotations_memory,
+            relative_abundances=relative_abundances_memory,
+            trophic_group_proportions=trophic_group_proportions_memory,
+        )
         draft_text = json.dumps(payload, ensure_ascii=False, indent=2)
         draft_bytes = draft_text.encode("utf-8")
 
@@ -2389,7 +3062,14 @@ def main(page: ft.Page):
             else:
                 raise ValueError("The selected file could not be read.")
             payload = json.loads(draft_text)
-            loaded_project_name, loaded_samples, loaded_abundances = parse_draft_payload(payload)
+            (
+                loaded_project_name,
+                loaded_samples,
+                loaded_abundances,
+                loaded_relative_abundances,
+                loaded_trophic_group_proportions,
+                loaded_annotations,
+            ) = parse_draft_payload(payload)
         except json.JSONDecodeError as ex:
             show_dialog("Invalid Draft File", f"The selected file is not valid JSON.\nError: {ex}")
             return
@@ -2399,12 +3079,26 @@ def main(page: ft.Page):
 
         has_current_data = bool(samples_memory or abundances_memory or sample_form.controls)
         if not has_current_data:
-            apply_loaded_draft(loaded_project_name, loaded_samples, loaded_abundances)
+            apply_loaded_draft(
+                loaded_project_name,
+                loaded_samples,
+                loaded_abundances,
+                loaded_relative_abundances,
+                loaded_trophic_group_proportions,
+                loaded_annotations,
+            )
             return
 
         def on_confirm_load(event):
             page.pop_dialog()
-            apply_loaded_draft(loaded_project_name, loaded_samples, loaded_abundances)
+            apply_loaded_draft(
+                loaded_project_name,
+                loaded_samples,
+                loaded_abundances,
+                loaded_relative_abundances,
+                loaded_trophic_group_proportions,
+                loaded_annotations,
+            )
 
         def on_cancel_load(event):
             page.pop_dialog()
@@ -2430,49 +3124,45 @@ def main(page: ft.Page):
         page.services.append(picker)
 
         async def export_clicked(e):
-            folder_path = await picker.get_directory_path(
-                dialog_title=translate_text("Select Export Folder"),
-                initial_directory=str(Path.home())
-            )
-            if not folder_path:
-                return
-
-            out_dir = Path(folder_path)
             project_prefix = sanitize_filename_prefix(current_project["name"])
             try:
-                total_file = out_dir / f"{project_prefix}_total_abundance.csv"
-                with open(total_file, "w", newline="", encoding="utf-8") as f:
-                    writer = csv.writer(f)
-                    writer.writerow(["SampleID", "Abundance"])
-                    for name, abund in samples_memory.items():
-                        writer.writerow([name, abund])
-
-                genus_file = out_dir / f"{project_prefix}_genus_abundance.csv"
-                all_genera = sorted({la for _, la, _ in abundances_memory})
-                sample_data = {}
-                for sname, la, abund in abundances_memory:
-                    if sname not in sample_data:
-                        sample_data[sname] = {}
-                    sample_data[sname][la] = abund
-
-                with open(genus_file, "w", newline="", encoding="utf-8") as f:
-                    writer = csv.writer(f)
-                    writer.writerow(["SampleID"] + all_genera)
-                    for sname in samples_memory.keys():
-                        row = [sname]
-                        for genus in all_genera:
-                            row.append(sample_data.get(sname, {}).get(genus, ""))
-                        writer.writerow(row)
-
-                snackbar = ft.SnackBar(
-                    ft.Text(f"Files saved to: {out_dir.resolve()}"), duration=3000
+                payload = build_project_workbook_bytes(
+                    current_project["name"],
+                    samples_memory,
+                    abundances_memory,
+                    annotations=genus_annotations_memory,
+                    relative_abundances=relative_abundances_memory,
+                    trophic_group_proportions=trophic_group_proportions_memory,
                 )
-                localize_control(snackbar)
-                page.overlay.append(snackbar)
-                snackbar.open = True
+                save_path = await picker.save_file(
+                    dialog_title=translate_text("Save Project Excel Workbook"),
+                    file_name=f"{project_prefix}.xlsx",
+                    initial_directory=str(Path.home()),
+                    file_type=ft.FilePickerFileType.CUSTOM,
+                    allowed_extensions=["xlsx"],
+                    src_bytes=payload,
+                )
+                if page.web:
+                    show_snackbar("Excel download started.")
+                    return
+                if not save_path:
+                    return
 
+                workbook_path = Path(save_path)
+                if workbook_path.suffix.lower() != ".xlsx":
+                    workbook_path = workbook_path.with_suffix(".xlsx")
+                workbook_path.write_bytes(payload)
+                show_snackbar(f"Excel saved to: {workbook_path.resolve()}")
             except (OSError, PermissionError, IOError) as ex:
-                show_dialog("Export Failed", f"Could not save files.\nError: {ex}")
+                show_dialog(
+                    "Export Failed",
+                    f"Could not save the Excel workbook.\nError: {ex}",
+                )
+            except Exception as ex:
+                show_dialog(
+                    "Export Failed",
+                    f"Could not create the Excel workbook.\nError: {ex}",
+                )
 
             page.update()
 
@@ -2945,7 +3635,7 @@ def main(page: ft.Page):
             ft.Icons.SAVE,
             "Drafts",
             [
-                "Save Draft writes the current project and saved samples to a .nemadb draft file.",
+                "Save Draft writes the current project, saved samples, stored relative and trophic-group proportions, and deduplicated genus annotations to a .nemadb draft file.",
                 "Load Draft restores a saved .nemadb file so you can continue editing later.",
                 "Loading a draft replaces the current input data after confirmation.",
             ],
@@ -2954,9 +3644,12 @@ def main(page: ft.Page):
             ft.Icons.DOWNLOAD,
             "Export",
             [
-                "Export asks you to choose an output folder.",
-                "NemaDB writes <project>_total_abundance.csv with SampleID and total abundance.",
-                "NemaDB also writes <project>_genus_abundance.csv with SampleID as rows and genus names as columns.",
+                "Export asks you where to save one <project>.xlsx workbook.",
+                "The Genus Annotations sheet contains one deduplicated taxonomy and trait record per project genus.",
+                "The Abundance sheet contains SampleID, abundance, and the Ba, Fu, Pp, Op, and Other proportions.",
+                "Trophic-group proportions are abundance-weighted; Predators and Omnivores are combined as Op, and every other feeding type is Other.",
+                "The Genus Abundance sheet contains samples as rows and Latin genus names as columns.",
+                "The Genus Relative Abundance sheet contains genus abundance divided by the sum of genus abundances in each sample.",
                 "The project name is used as the filename prefix, so rename the project before exporting if needed.",
             ],
         ),

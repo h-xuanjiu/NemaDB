@@ -14,13 +14,13 @@ A lightweight nematode data utility built with [Flet](https://flet.dev/).
 - **📚 Batch search & pair check** – Compare mixed-language lists with full standard records: matched pairs use one row, while mismatches split into per-input diagnostic rows
 - **📋 Copy & download** – Select table text, copy complete result sets, or export them as CSV
 - **🗃️ Full database view** – Open the record-count badge to browse and download all records
-- **📥 Input** – Create samples and record genus abundances with auto-complete
-- **💾 Export** – Export to `total_abundance.csv` and `genus_abundance.csv`
+- **📥 Input** – Create samples and record genus abundances with auto-complete, entry-time relative abundance and trophic-group calculations, and project-level genus annotations
+- **💾 Export** – Export one `.xlsx` workbook with genus annotations, abundance plus Ba/Fu/Pp/Op/Other proportions, sample-by-genus abundance, and sample-by-genus relative abundance
 
 ## Requirements
 
 - Python 3.10+
-- Flet 1.0.1 (installed with the project)
+- Flet 1.0.1 and OpenPyXL 3.0.9+ (installed with the project)
 
 
 
